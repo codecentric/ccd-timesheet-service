@@ -1,4 +1,4 @@
-package de.codecentric.ccdashboard.service.timesheet
+package de.codecentric.ccdashboard.service.timesheet.rest
 
 import akka.actor.Actor
 import spray.http.MediaTypes._
