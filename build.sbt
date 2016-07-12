@@ -6,7 +6,11 @@ lazy val root = (project in file(".")).
     scalaVersion := "2.11.8"
   )
 
+// Additional resolvers
+resolvers += "spray repo" at "http://repo.spray.io"
+
 // Project dependencies
 libraryDependencies ++= Seq(
+  "io.spray" %% "spray-can" % "1.3.3"
   //  groupID %% artifactID % revision
 )
