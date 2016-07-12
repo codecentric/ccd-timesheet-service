@@ -16,10 +16,19 @@ libraryDependencies ++= {
 
   Seq(
     //  groupID %% artifactID % revision
+    // Rest server
     "io.spray" %% "spray-can" % sprayV,
     "io.spray" %% "spray-routing" % sprayV,
     "io.spray" %% "spray-testkit" % sprayV % "test",
+
+    // Actors
     "com.typesafe.akka" %% "akka-actor" % akkaV,
-    "org.scala-lang.modules" %% "scala-xml" % "1.0.4"
+
+    // Prevent warning
+    "org.scala-lang.modules" %% "scala-xml" % "1.0.4",
+
+    // Logging
+    "ch.qos.logback" % "logback-classic" % "1.1.7",
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0"
   )
 }
