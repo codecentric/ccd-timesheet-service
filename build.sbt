@@ -10,7 +10,16 @@ lazy val root = (project in file(".")).
 resolvers += "spray repo" at "http://repo.spray.io"
 
 // Project dependencies
-libraryDependencies ++= Seq(
-  "io.spray" %% "spray-can" % "1.3.3"
-  //  groupID %% artifactID % revision
-)
+libraryDependencies ++= {
+  val akkaV = "2.3.9"
+  val sprayV = "1.3.3"
+
+  Seq(
+    //  groupID %% artifactID % revision
+    "io.spray" %% "spray-can" % sprayV,
+    "io.spray" %% "spray-routing" % sprayV,
+    "io.spray" %% "spray-testkit" % sprayV % "test",
+    "com.typesafe.akka" %% "akka-actor" % akkaV,
+    "org.scala-lang.modules" %% "scala-xml" % "1.0.4"
+  )
+}
