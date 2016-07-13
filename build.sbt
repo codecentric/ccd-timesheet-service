@@ -29,6 +29,12 @@ libraryDependencies ++= {
 
     // Logging
     "ch.qos.logback" % "logback-classic" % "1.1.7",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0"
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
+
+    // Data-access
+    "com.typesafe.slick" %% "slick" % "3.1.1",
+
+    // Database drivers
+    "com.h2database" % "h2" % "1.4.192"
   )
 }
