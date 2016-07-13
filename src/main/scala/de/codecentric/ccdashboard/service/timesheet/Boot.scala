@@ -7,12 +7,9 @@ import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import de.codecentric.ccdashboard.service.timesheet.dataimport.DataImportActor
-import de.codecentric.ccdashboard.service.timesheet.dataimport.schema.DummyData
 import de.codecentric.ccdashboard.service.timesheet.rest.MyServiceActor
-import slick.driver.H2Driver.api._
 import spray.can.Http
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 /**
@@ -23,19 +20,21 @@ object Boot extends App with StrictLogging {
 
   val conf = ConfigFactory.load()
 
-  // Set-up demo data in the database
-  val db = Database.forConfig("h2mem1")
-  val dummyTable = TableQuery[DummyData]
-  val dbSetup = DBIO.seq(
-    dummyTable.schema.create,
-    dummyTable ++= Seq(
-      ("A", 42, 180.5),
-      ("B", 32, 176.5),
-      ("C", 60, 160.0)
+  /*
+    // Set-up demo data in the database
+    val db = Database.forConfig("h2mem1")
+    val dummyTable = TableQuery[DummyData]
+    val dbSetup = DBIO.seq(
+      dummyTable.schema.create,
+      dummyTable ++= Seq(
+        ("A", 42, 180.5),
+        ("B", 32, 176.5),
+        ("C", 60, 160.0)
+      )
     )
-  )
-  val dbSetupFuture = db.run(dbSetup)
-  Await.result(dbSetupFuture, Duration.Inf)
+    val dbSetupFuture = db.run(dbSetup)
+    Await.result(dbSetupFuture, Duration.Inf)
+  */
 
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("timesheet-actor-system")
@@ -55,8 +54,11 @@ object Boot extends App with StrictLogging {
   // start a new HTTP server on port 8080 with our service actor as the handler
   IO(Http) ? Http.Bind(restService, interface, port)
 
+  // Test
+  dataImporter ! "say"
 }
 
+// Command case classes
 case class Start()
 
 case class Stop()
