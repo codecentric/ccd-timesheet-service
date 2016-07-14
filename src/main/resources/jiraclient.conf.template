@@ -3,4 +3,5 @@ jira {
   access-token: ""
   tempo-api-token: ""
   consumer-private-key: ""
+  timeout: 15s
 }
