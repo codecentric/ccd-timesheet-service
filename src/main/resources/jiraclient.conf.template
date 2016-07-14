@@ -1,0 +1,6 @@
+jira {
+  base-url: ""
+  access-token: ""
+  tempo-api-token: ""
+  consumer-private-key: ""
+}
