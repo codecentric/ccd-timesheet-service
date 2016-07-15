@@ -11,13 +11,14 @@ resolvers += "spray repo" at "http://repo.spray.io"
 
 // Project dependencies
 libraryDependencies ++= {
-  val akkaV = "2.3.9"
+  val akkaV = "2.4.8"
   val sprayV = "1.3.3"
   Seq(
     //  groupID %% artifactID % revision
-    // Rest server
+    // Rest server and client
     "io.spray" %% "spray-can" % sprayV,
     "io.spray" %% "spray-routing" % sprayV,
+    "io.spray" %% "spray-client" % sprayV,
     "io.spray" %% "spray-testkit" % sprayV % "test",
     // Actors
     "com.typesafe.akka" %% "akka-actor" % akkaV,
@@ -32,3 +33,5 @@ libraryDependencies ++= {
     "com.h2database" % "h2" % "1.4.192"
   )
 }
+
+//mainClass in (Compile, run) := Some("de.codecentric.ccdashboard.service.timesheet.dataimport.ImportTest")
