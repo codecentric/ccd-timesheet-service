@@ -7,14 +7,14 @@ import spray.routing.HttpService
 /**
   * Created by bjacobs on 12.07.16.
   */
-class MyServiceActor extends Actor with MyService {
+class DataServiceActor extends Actor with DataService {
   def receive = runRoute(myRoute)
 
   def actorRefFactory = context
 }
 
 // this trait defines our service behavior independently from the service actor
-trait MyService extends HttpService {
+trait DataService extends HttpService {
 
   val myRoute =
     path("") {

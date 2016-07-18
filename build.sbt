@@ -30,7 +30,10 @@ libraryDependencies ++= {
     // Data-access
     "com.typesafe.slick" %% "slick" % "3.1.1",
     // Database drivers
-    "com.h2database" % "h2" % "1.4.192"
+    "com.h2database" % "h2" % "1.4.192",
+    // Testing
+    "org.scalatest" %% "scalatest" % "2.2.6" % "test",
+    "com.typesafe.akka" %% "akka-testkit" % akkaV
   )
 }
 

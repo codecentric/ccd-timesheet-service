@@ -1,7 +1,11 @@
 jira {
-  base-url: ""
+  # http or https
+  scheme: ""
+  # hostname, e.g. "jira.mycompany.de"
+  host: ""
+  # path of tempo service, e.g. "/plugins/servlet/tempo-getWorklog/"
+  tempo-service-path: ""
   access-token: ""
   tempo-api-token: ""
   consumer-private-key: ""
-  timeout: 15s
 }
