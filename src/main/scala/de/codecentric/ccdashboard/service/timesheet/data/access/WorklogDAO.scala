@@ -75,11 +75,9 @@ class WorklogDAO(val driver: JdbcProfile) {
     override def * = (worklogId, (issueId, issueKey), hours, workDate, workDateTime, username, staffId, (billingKey, billingAttributes),
       (activityId, activityName), workDescription, parentKey, reporterUserName, (externalId, externalTimestamp, externalHours, externalResult),
       (customField10084, customField10100, customField10406, customField10501), hashValue).shaped <> ( {
-      case (worklogId, issue, hours, workDate, workDateTime, username, staffId, billing, activity, workDescription, parentKey, reporterUserName,
-      external, customFields, hashValue) =>
-        Worklog(worklogId, Issue.tupled.apply(issue), hours, workDate, workDateTime, username, staffId, Billing.tupled.apply(billing),
-          Activity.tupled.apply(activity), workDescription, parentKey, reporterUserName, External.tupled.apply(external),
-          CustomFields.tupled.apply(customFields), hashValue)
+      case (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15) =>
+        Worklog(x1, Issue.tupled.apply(x2), x3, x4, x5, x6, x7, Billing.tupled.apply(x8), Activity.tupled.apply(x9),
+          x10, x11, x12, External.tupled.apply(x13), CustomFields.tupled.apply(x14), x15)
     }, { w: Worklog =>
       Some(w.worklogId, Issue.unapply(w.issue).get, w.hours, w.workDate, w.workDateTime, w.username, w.staffId, Billing.unapply(w.billing).get,
         Activity.unapply(w.activity).get, w.workDescription, w.parentKey, w.reporterUserName, External.unapply(w.external).get,
@@ -88,19 +86,6 @@ class WorklogDAO(val driver: JdbcProfile) {
   }
 
   val props = TableQuery[WorklogTableRow]
-
-  /** Create the database schema */
-  def create: DBIO[Unit] = props.schema.create
-
-  /** Insert a key/value pair */
-  def insert(v: Worklog): DBIO[Int] = props += v
-
-  def insert(v: Seq[Worklog]): DBIO[Option[Int]] = props ++= v
-
-  /** Get the value for the given key */
-  //  def get(k: String): DBIO[Option[String]] = (for (p <- props if p.key === k) yield p.value).result.headOption
-
-  def getFirst(x: Int): DBIO[Seq[Worklog]] = props.take(x).result
 
   /** Get the first element for a Query from this DAO */
   def getFirst[M, U, C[_]](q: Query[M, U, C]): DBIO[U] = q.result.head
