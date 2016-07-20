@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.access
 import java.sql.{Date, Timestamp}
 import java.time.{LocalDate, LocalDateTime}
 
-import de.codecentric.ccdashboard.service.timesheet.data.schema._
+import de.codecentric.ccdashboard.service.timesheet.data.model._
 import slick.driver.JdbcProfile
 
 import scala.language.higherKinds
@@ -13,6 +13,7 @@ class WorklogDAO(val driver: JdbcProfile) {
   // Import the Scala API from the driver
   import driver.api._
 
+  // Provide implicit mappers for LocalDate and LocalDateTime classes that we use
   implicit val myDateColumnType = MappedColumnType.base[LocalDate, Date](
     ld => Date.valueOf(ld),
     d => d.toLocalDate
@@ -87,6 +88,13 @@ class WorklogDAO(val driver: JdbcProfile) {
 
   val props = TableQuery[WorklogTableRow]
 
-  /** Get the first element for a Query from this DAO */
-  def getFirst[M, U, C[_]](q: Query[M, U, C]): DBIO[U] = q.result.head
+  /** Create the database schema */
+  def create: DBIO[Unit] = props.schema.create
+
+  /** Insert a key/value pair */
+  def insert(v: Worklog): DBIO[Int] = props += v
+
+  def insert(v: Seq[Worklog]): DBIO[Option[Int]] = props ++= v
+
+  def getFirst(x: Int): DBIO[Seq[Worklog]] = props.take(x).result
 }

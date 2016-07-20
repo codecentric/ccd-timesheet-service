@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.source.jira
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
 
-import de.codecentric.ccdashboard.service.timesheet.data.schema._
+import de.codecentric.ccdashboard.service.timesheet.data.model._
 
 import scala.xml.Node
 

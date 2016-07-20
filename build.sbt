@@ -6,21 +6,16 @@ lazy val root = (project in file(".")).
     scalaVersion := "2.11.8"
   )
 
-// Additional resolvers
-resolvers += "spray repo" at "http://repo.spray.io"
-
 // Project dependencies
 libraryDependencies ++= {
   val akkaV = "2.4.8"
-  val sprayV = "1.3.3"
+  val slickV = "3.1.1"
+
   Seq(
     //  groupID %% artifactID % revision
-    // Rest server and client
-    "io.spray" %% "spray-can" % sprayV,
-    "io.spray" %% "spray-routing" % sprayV,
-    "io.spray" %% "spray-client" % sprayV,
-    "io.spray" %% "spray-testkit" % sprayV % "test",
-    // Actors
+    // Actors, rest server and client
+    "com.typesafe.akka" %% "akka-http-experimental" % akkaV,
+    "com.typesafe.akka" %% "akka-http-spray-json-experimental" % akkaV,
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     // Prevent warning
     "org.scala-lang.modules" %% "scala-xml" % "1.0.4",
@@ -28,7 +23,8 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
     // Data-access
-    "com.typesafe.slick" %% "slick" % "3.1.1",
+    "com.typesafe.slick" %% "slick" % slickV,
+    "com.typesafe.slick" %% "slick-hikaricp" % slickV,
     // Database drivers
     "com.h2database" % "h2" % "1.4.192",
     // Testing

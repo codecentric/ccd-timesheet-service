@@ -2,62 +2,45 @@ package de.codecentric.ccdashboard.service.timesheet
 
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
-import akka.io.IO
-import akka.pattern.ask
-import akka.util.Timeout
+import akka.http.scaladsl.Http
+import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
+import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
-import de.codecentric.ccdashboard.service.timesheet.data.server.H2DataServerActor
+import de.codecentric.ccdashboard.service.timesheet.messages.Start
 import de.codecentric.ccdashboard.service.timesheet.rest.DataServiceActor
-import spray.can.Http
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.io.StdIn
 
 /**
   * Created by bjacobs on 12.07.16.
   */
 object Boot extends App {
   val conf = ConfigFactory.load()
+  val interface = conf.getString("timesheet-service.interface")
+  val port = conf.getInt("timesheet-service.rest-port")
 
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("timesheet-actor-system")
 
+  implicit val materializer = ActorMaterializer()
+  // needed for the future flatMap/onComplete in the end
+  implicit val executionContext = system.dispatcher
+
   val logger = Logging.getLogger(system, this)
 
-  // create and start our rest service actor
-  val restService = system.actorOf(Props[DataServiceActor], "rest-service")
-
-  // create and start our data importer actor
+  // create and start our main actors and components
   val dataImporter = system.actorOf(Props(new DataIngestActor(conf)), "data-importer")
+  val dataProvider = system.actorOf(Props(new DataProviderActor(conf)), "h2-data-provider")
+  val route = new DataServiceActor(dataProvider).route
+  val bindingFuture = Http().bindAndHandle(route, interface, port)
 
-  val dataServer = system.actorOf(Props(new H2DataServerActor(conf)), "h2-data-server")
-
-  //  val deadLetterListener = system.actorOf(Props(classOf[DeadLetterListenerActor]))
-  //  system.eventStream.subscribe(deadLetterListener, classOf[DeadLetter])
-
-  // Start the services
+  // Start importing
   dataImporter ! Start
 
-  implicit val timeout = Timeout(5.seconds)
-  val interface = conf.getString("timesheet-service.interface")
-  val port = conf.getInt("timesheet-service.rest-port")
-  // start a new HTTP server on port 8080 with our service actor as the handler
-  IO(Http) ? Http.Bind(restService, interface, port)
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  val f = Future {
-    Thread.sleep(5000)
-    logger.info("Now querying...")
-    dataServer ! WorklogQuery(3)
-  }
-
+  println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
+  StdIn.readLine() // let it run until user presses return
+  bindingFuture
+    .flatMap(_.unbind()) // trigger unbinding from the port
+    .onComplete(_ => system.terminate()) // and shutdown when done
 }
-
-// Command case classes
-case class Start()
-
-case class Stop()
-
-case class WorklogQuery(x: Int)

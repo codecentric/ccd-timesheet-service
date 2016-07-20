@@ -1,4 +1,4 @@
-package de.codecentric.ccdashboard.service.timesheet.data.schema
+package de.codecentric.ccdashboard.service.timesheet.data.model
 
 import java.time.{LocalDate, LocalDateTime}
 
@@ -63,4 +63,5 @@ case class Activity(id: String, name: String)
 case class External(id: String, timestamp: Option[LocalDateTime], hours: Double, result: String)
 
 case class CustomFields(field10083: Option[Double], field10100: String, field10406: Option[Double], field10501: Option[LocalDateTime])
+
 
