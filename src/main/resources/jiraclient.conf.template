@@ -1,11 +1,34 @@
 jira {
   # http or https
-  scheme: ""
+  scheme: "https"
+
   # hostname, e.g. "jira.mycompany.de"
   host: ""
-  # path of tempo service, e.g. "/plugins/servlet/tempo-getWorklog/"
-  tempo-service-path: ""
-  access-token: ""
-  tempo-api-token: ""
+
+  # consumer key as configured in JIRA
+  consumer-key: ""
+
+  # consumer private key
   consumer-private-key: ""
+
+  # default URI for request-token
+  request-token-uri: "/plugins/servlet/oauth/request-token"
+
+  # default URI for token authorization
+  authorize-token-uri: "/plugins/servlet/oauth/authorize?oauth_token=%s"
+
+  # default URI for access-token
+  access-token-uri: "/plugins/servlet/oauth/access-token"
+
+  # provide access-token here. Generate using RequestToken object
+  access-token: ""
+
+  # tempo plugin specific configuration
+  tempo {
+    # default URI for tempo getWorklog service
+    service-path: "/plugins/servlet/tempo-getWorklog/"
+
+    # access token for tempo API
+    api-token: ""
+  }
 }

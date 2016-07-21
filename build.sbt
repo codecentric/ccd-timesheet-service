@@ -29,7 +29,9 @@ libraryDependencies ++= {
     "com.h2database" % "h2" % "1.4.192",
     // Testing
     "org.scalatest" %% "scalatest" % "2.2.6" % "test",
-    "com.typesafe.akka" %% "akka-testkit" % akkaV
+    "com.typesafe.akka" %% "akka-testkit" % akkaV,
+    // OAuth
+    "com.github.scribejava" % "scribejava-core" % "2.8.1"
   )
 }
 

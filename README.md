@@ -13,6 +13,9 @@ Currently supported databases:
 ## Configuration ##
 Start at application.conf and jiraclient.conf
 
+## Access token generation ##
+After configuring jiraclient.conf with the available information, execute JiraOAuthTokenRequest and follow the instructions
+
 ## Start ##
 execute Boot.scala
 Note: more info to come

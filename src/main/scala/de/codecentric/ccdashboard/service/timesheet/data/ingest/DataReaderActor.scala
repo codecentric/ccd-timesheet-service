@@ -37,9 +37,9 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   val jiraScheme = jiraConf.getString("jira.scheme")
   val jiraHost = jiraConf.getString("jira.host")
-  val jiraTempoPath = jiraConf.getString("jira.tempo-service-path")
+  val jiraTempoPath = jiraConf.getString("jira.tempo.service-path")
   val accessToken = jiraConf.getString("jira.access-token")
-  val tempoApiToken = jiraConf.getString("jira.tempo-api-token")
+  val tempoApiToken = jiraConf.getString("jira.tempo.api-token")
   val consumerPrivateKey = jiraConf.getString("jira.consumer-private-key")
 
   val importStartDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
