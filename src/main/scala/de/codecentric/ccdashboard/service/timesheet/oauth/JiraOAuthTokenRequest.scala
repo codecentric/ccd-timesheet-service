@@ -24,7 +24,7 @@ object JiraOAuthTokenRequest extends App {
 
   // Instantiate jiraApi and OAuth service
   val jiraApi = new JiraApi(jiraConsumerPrivateKey, authorizationUri, requestTokenUri, accessTokenUri)
-  val service = new ServiceBuilder().apiKey("ccdashboard_consumer_key").build(jiraApi)
+  val service = new ServiceBuilder().apiKey(jiraConsumerKey).build(jiraApi)
 
   // Request request-token, authorize it, then get get access-token
   val requestToken = service.getRequestToken
