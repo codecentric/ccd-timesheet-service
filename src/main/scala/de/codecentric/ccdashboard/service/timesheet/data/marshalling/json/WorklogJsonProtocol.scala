@@ -1,4 +1,4 @@
-package de.codecentric.ccdashboard.service.timesheet.data.marshalling
+package de.codecentric.ccdashboard.service.timesheet.data.marshalling.json
 
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
@@ -7,9 +7,10 @@ import de.codecentric.ccdashboard.service.timesheet.data.model._
 import spray.json.{DefaultJsonProtocol, DeserializationException, JsString, JsValue, RootJsonFormat}
 
 /**
-  * Created by bjacobs on 19.07.16.
+  * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
-object WorklogJsonProtocol extends DefaultJsonProtocol {
+
+trait WorklogJsonProtocol extends DefaultJsonProtocol {
 
   implicit object LocalDateTimeJsonFormat extends RootJsonFormat[LocalDateTime] {
     private val localDateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME
