@@ -16,7 +16,7 @@ class DataIngestActor(conf: Config) extends Actor with ActorLogging {
       log.info("Data ingest actor starting...")
 
       // Spawn DataWriter Actor for current database
-      val dataWriterActor = context.system.actorOf(Props(new DataWriterActor2(conf)), "data-writer")
+      val dataWriterActor = context.system.actorOf(Props(new DataWriterActor(conf)), "data-writer")
 
       // Spawn DataReader Actor for JIRA and provide ActorRef
       val dataReaderActor = context.system.actorOf(Props(new JiraDataReaderActor(conf, dataWriterActor)), "data-reader")

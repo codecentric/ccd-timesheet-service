@@ -2,36 +2,39 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import akka.actor.{Actor, ActorLogging}
 import com.typesafe.config.Config
-import de.codecentric.ccdashboard.service.timesheet.data.access.DAO
-import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
-import slick.backend.DatabaseConfig
-import slick.driver.JdbcDriver
+import de.codecentric.ccdashboard.service.timesheet.data.model._
+import io.getquill.{CassandraSyncContext, SnakeCase}
 
 /**
   * Actor that receives Worklogs from a DataIngestActor and stores inserts them into the database
   */
 class DataWriterActor(conf: Config) extends Actor with ActorLogging {
-  val dbConfigKey = conf.getString("timesheet-service.database-config-key")
-  val dbConfig = DatabaseConfig.forConfig[JdbcDriver](dbConfigKey)
-  val db = dbConfig.db
-  val dao = new DAO(dbConfig.driver).worklogDAO
 
   import context.dispatcher
+  import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 
-  val dbSetupFuture = db.run(dao.create)
-  dbSetupFuture.onComplete(_ => log.info("Instantiated"))
+  val dbConfigKey = conf.getString("timesheet-service.database-config-key")
+  val worklogTableName = conf.getString("timesheet-service.tablenames.worklogs")
+
+  lazy val ctx = new CassandraSyncContext[SnakeCase](dbConfigKey)
+
+  import ctx._
+
+  def insert(w: List[Worklog]) = quote {
+    liftQuery(w).foreach(worklog => {
+      // Until this is fixed, table name is hardcoded. See https://github.com/getquill/quill/issues/501
+      // query[JiraWorklog].schema(_.entity(worklogTableName)).insert(worklog)
+      query[Worklog].insert(worklog)
+    })
+  }
 
   def receive = {
-    case worklogs: Worklogs =>
-      log.info(s"Received ${worklogs.get.size} worklogs to store")
-    /*
-          val insertFuture = db.run(dao.insert(worklogs.get))
-          insertFuture.onSuccess {
-            case Some(i: Int) => log.info(s"Number of inserted elements: $i")
-            case None => log.info("No elements inserted.")
-          }
-    */
+    case w: Worklogs =>
+      val worklogs = w.get.toList
+      log.info(s"Received ${worklogs.size} worklogs to store")
 
-    case x => log.info(s"Received unknown message: $x")
+      ctx.run(insert(worklogs))
+
+    case x => log.warning(s"Received unknown message: $x")
   }
 }

@@ -12,8 +12,7 @@ resolvers +=
 // Project dependencies
 libraryDependencies ++= {
   val akkaV = "2.4.9"
-  val slickV = "3.1.1"
-  val circeV = "0.5.0-M2"
+  val circeV = "0.5.0-M3"
   val quillV = "0.9.1-SNAPSHOT"
 
 
@@ -28,9 +27,6 @@ libraryDependencies ++= {
     "ch.qos.logback" % "logback-classic" % "1.1.7",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.4.0",
     // Data-access
-    "com.typesafe.slick" %% "slick" % slickV,
-    "com.typesafe.slick" %% "slick-hikaricp" % slickV,
-    // Data-access (Quill)
     "io.getquill" %% "quill-core" % quillV,
     "io.getquill" %% "quill-cassandra" % quillV,
     // Database drivers
