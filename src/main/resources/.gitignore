@@ -1,2 +1,3 @@
 jiraclient.conf
 *.json
+/dummydata/

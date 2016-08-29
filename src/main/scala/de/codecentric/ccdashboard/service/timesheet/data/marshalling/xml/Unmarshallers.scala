@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.marshalling.xml
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.unmarshalling._
 import akka.stream.Materializer
-import de.codecentric.ccdashboard.service.timesheet.data.source.jira.JiraWorklog
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira.JiraWorklog
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.xml.XML

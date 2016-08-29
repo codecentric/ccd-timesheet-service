@@ -24,7 +24,7 @@ class WorklogDAO(val driver: JdbcProfile) {
     timestamp => timestamp.toLocalDateTime
   )
 
-  class WorklogTableRow(tag: Tag) extends Table[Worklog](tag, "worklogs") {
+  class WorklogTableRow(tag: Tag) extends Table[OldWorklog](tag, "worklogs") {
     def worklogId = column[Int]("worklog_id", O.PrimaryKey)
 
     def issueId = column[Int]("issue_id")
@@ -77,9 +77,9 @@ class WorklogDAO(val driver: JdbcProfile) {
       (activityId, activityName), workDescription, parentKey, reporterUserName, (externalId, externalTimestamp, externalHours, externalResult),
       (customField10084, customField10100, customField10406, customField10501), hashValue).shaped <> ( {
       case (x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15) =>
-        Worklog(x1, Issue.tupled.apply(x2), x3, x4, x5, x6, x7, Billing.tupled.apply(x8), Activity.tupled.apply(x9),
+        OldWorklog(x1, Issue.tupled.apply(x2), x3, x4, x5, x6, x7, Billing.tupled.apply(x8), Activity.tupled.apply(x9),
           x10, x11, x12, External.tupled.apply(x13), CustomFields.tupled.apply(x14), x15)
-    }, { w: Worklog =>
+    }, { w: OldWorklog =>
       Some(w.worklogId, Issue.unapply(w.issue).get, w.hours, w.workDate, w.workDateTime, w.username, w.staffId, Billing.unapply(w.billing).get,
         Activity.unapply(w.activity).get, w.workDescription, w.parentKey, w.reporterUserName, External.unapply(w.external).get,
         CustomFields.unapply(w.customFields).get, w.hashValue)
@@ -92,9 +92,9 @@ class WorklogDAO(val driver: JdbcProfile) {
   def create: DBIO[Unit] = props.schema.create
 
   /** Insert a key/value pair */
-  def insert(v: Worklog): DBIO[Int] = props += v
+  def insert(v: OldWorklog): DBIO[Int] = props += v
 
-  def insert(v: Seq[Worklog]): DBIO[Option[Int]] = props ++= v
+  def insert(v: Seq[OldWorklog]): DBIO[Option[Int]] = props ++= v
 
-  def getFirst(x: Int): DBIO[Seq[Worklog]] = props.take(x).result
+  def getFirst(x: Int): DBIO[Seq[OldWorklog]] = props.take(x).result
 }

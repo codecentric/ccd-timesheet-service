@@ -1,4 +1,4 @@
-package de.codecentric.ccdashboard.service.timesheet.data.source.jira
+package de.codecentric.ccdashboard.service.timesheet.data.model.jira
 
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
@@ -33,11 +33,22 @@ case class JiraWorklog(worklogId: Int,
                        hashValue: String) extends Workloggable {
 
   override def toWorklog = Worklog(
+    worklogId, issueId, issueKey, hours, workDate, workDateTime, username, staffId, billingKey, billingAttributes,
+    activityId, activityName, workDescription, parentKey, reporterUserName, externalId, externalTimestamp,
+    externalHours, externalResult, customField10084, customField10100, customField10406, customField10501, hashValue
+  )
+}
+
+// extends Workloggable {
+
+/*
+  override def toWorklog = Worklog(
     worklogId, Issue(issueId, issueKey), hours, workDate, workDateTime, username, staffId, Billing(billingKey, billingAttributes),
     Activity(activityId, activityName), workDescription, parentKey, reporterUserName, External(externalId, externalTimestamp,
       externalHours, externalResult), CustomFields(customField10084, customField10100, customField10406, customField10501), hashValue
   )
 }
+*/
 
 object JiraWorklog {
   val jiraDateTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss[.S]")

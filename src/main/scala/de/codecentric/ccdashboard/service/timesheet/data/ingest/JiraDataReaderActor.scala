@@ -7,12 +7,14 @@ import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.pipe
+import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
-import de.codecentric.ccdashboard.service.timesheet.data.marshalling.json.MasterJsonProtocol._
 import de.codecentric.ccdashboard.service.timesheet.data.marshalling.xml.Unmarshallers
 import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
-import de.codecentric.ccdashboard.service.timesheet.data.source.jira._
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
 import de.codecentric.ccdashboard.service.timesheet.messages.Start
+import io.circe.generic.auto._
+import io.circe.parser._
 
 import scala.concurrent.duration._
 
@@ -31,6 +33,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
   val jiraUsersServicePath = jiraConf.getString("get-users-service-path")
   val jiraIssueDetailsServicePath = jiraConf.getString("get-issue-details-service-path")
   val jiraTempoTeamServicePath = jiraConf.getString("get-tempo-team-service-path")
+  val jiraTempoTeamMembersServicePath = jiraConf.getString("get-tempo-team-members-service-path")
   val jiraTempoPath = jiraConf.getString("tempo.service-path")
   val jiraAuthority = Uri.Authority(Uri.Host(jiraHost))
 
@@ -57,13 +60,16 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       context.system.scheduler.scheduleOnce(1.seconds, self, TempoQueryTask)
 
     // Start Jira Queries async
-    //context.system.scheduler.scheduleOnce(2.seconds, self, JiraUserQueryTask(0, 0))
+    //context.system.scheduler.scheduleOnce(0.seconds, self, JiraUserQueryTask(0, 0))
 
     // Query one issue
-    //context.system.scheduler.scheduleOnce(1.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
+    // context.system.scheduler.scheduleOnce(5.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
 
     // Query tempo teams
-    //context.system.scheduler.scheduleOnce(1.seconds, self, JiraTempoTeamQueryTask)
+    //context.system.scheduler.scheduleOnce(10.seconds, self, JiraTempoTeamQueryTask)
+
+    // Query one tempo team
+    //context.system.scheduler.scheduleOnce(15.seconds, self, JiraTempoTeamMembersQueryTask(15))
 
     case TempoQueryTask =>
       log.info("Tempo query task received.")
@@ -87,38 +93,56 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       val currentChar = alphabet(charIndex)
       val uri = getJiraUsersRequestUri(currentChar)
 
-      handleRequest(uri, signRequest = true, jsonEntityHandler(_)(jsonAST => {
-        val users = jsonAST.convertTo[Seq[User]]
+      handleRequest(uri, signRequest = true, jsonEntityHandler(_)(jsonString => {
+        decode[Seq[JiraUser]](jsonString) match {
+          case Xor.Left(error) => println(error)
+          case Xor.Right(users) =>
+            log.info(s"Received ${users.size} user")
+            // TODO store to database using writerActor
 
-        log.info(s"Received ${users.size} user")
-        // TODO store to database using writerActor
-
-        if (charIndex == alphabet.size - 1) {
-          log.info("Scheduling new iteration in 3600 seconds")
-          context.system.scheduler.scheduleOnce(3600.seconds, self, JiraUserQueryTask(iteration + 1, 0))
-        } else {
-          log.info("Scheduling next user query in 10 seconds")
-          context.system.scheduler.scheduleOnce(10.seconds, self, JiraUserQueryTask(iteration, charIndex + 1))
+            if (charIndex == alphabet.size - 1) {
+              log.info("Scheduling new iteration in 3600 seconds")
+              context.system.scheduler.scheduleOnce(3600.seconds, self, JiraUserQueryTask(iteration + 1, 0))
+            } else {
+              log.info("Scheduling next user query in 10 seconds")
+              context.system.scheduler.scheduleOnce(10.seconds, self, JiraUserQueryTask(iteration, charIndex + 1))
+            }
         }
       }))
 
     case JiraIssueDetailsQueryTask(issueId: Either[String, Int]) =>
       log.info(s"Querying issue details task for issue id $issueId received.")
       val queryUri = getJiraIssueDetailsUri(issueId)
-      handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonAST => {
-        val issue = jsonAST.convertTo[JiraIssue]
-        println(issue)
+      handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
+        decode[JiraIssue](jsonString) match {
+          case Xor.Left(error) => println(error)
+          case Xor.Right(jiraIssue) => println(jiraIssue)
+        }
       }))
 
     case JiraTempoTeamQueryTask =>
       log.info("Jira Tempo Team task received.")
       val queryUri = getJiraTempoTeamsUri
-      handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonAST => {
-        val teams = jsonAST.convertTo[Seq[JiraTempoTeam]]
-        teams.foreach(println)
+      handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
+        decode[Seq[JiraTempoTeam]](jsonString) match {
+          case Xor.Left(error) => println(error)
+          case Xor.Right(jiraTempoTeams) => println(jiraTempoTeams)
+        }
+      }))
+
+    case JiraTempoTeamMembersQueryTask(teamId) =>
+      log.info("Jira Tempo Team Members task received.")
+      val queryUri = getJiraTempoTeamMembersUri(teamId)
+      log.info(s"Using query URI: $queryUri")
+      handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
+        decode[Seq[JiraTempoTeamMember]](jsonString) match {
+          case Xor.Left(error) => println(error)
+          case Xor.Right(jiraTempoTeamMembers) => println(jiraTempoTeamMembers)
+        }
+        //val teamMembers = jsonAST.convertTo[Seq[JiraTempoTeamMember]]
+        //teamMembers.foreach(println)
       }))
   }
-
 
   def getWorklogRequestUri(fromDate: LocalDate, toDate: LocalDate) = {
     val queryString = Query(Map(
@@ -154,6 +178,11 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     val path = Uri.Path(jiraTempoTeamServicePath)
     Uri(scheme = jiraScheme, authority = jiraAuthority, path = path)
   }
+
+  def getJiraTempoTeamMembersUri(teamId: Int) = {
+    val path = Uri.Path(jiraTempoTeamMembersServicePath.format(teamId.toString))
+    Uri(scheme = jiraScheme, authority = jiraAuthority, path = path)
+  }
 }
 
 case class TempoQueryTask()
@@ -163,4 +192,6 @@ case class JiraUserQueryTask(iteration: Int, charIndex: Int)
 case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
 
 case class JiraTempoTeamQueryTask()
+
+case class JiraTempoTeamMembersQueryTask(teamId: Int)
 

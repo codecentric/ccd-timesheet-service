@@ -24,11 +24,13 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
   def receive = {
     case worklogs: Worklogs =>
       log.info(s"Received ${worklogs.get.size} worklogs to store")
-      val insertFuture = db.run(dao.insert(worklogs.get))
-      insertFuture.onSuccess {
-        case Some(i: Int) => log.info(s"Number of inserted elements: $i")
-        case None => log.info("No elements inserted.")
-      }
+    /*
+          val insertFuture = db.run(dao.insert(worklogs.get))
+          insertFuture.onSuccess {
+            case Some(i: Int) => log.info(s"Number of inserted elements: $i")
+            case None => log.info("No elements inserted.")
+          }
+    */
 
     case x => log.info(s"Received unknown message: $x")
   }

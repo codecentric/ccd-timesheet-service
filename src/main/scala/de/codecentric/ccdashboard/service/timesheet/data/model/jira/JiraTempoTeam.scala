@@ -1,4 +1,4 @@
-package de.codecentric.ccdashboard.service.timesheet.data.source.jira
+package de.codecentric.ccdashboard.service.timesheet.data.model.jira
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>

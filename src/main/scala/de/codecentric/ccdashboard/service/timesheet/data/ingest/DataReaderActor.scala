@@ -6,11 +6,9 @@ import akka.http.scaladsl.model._
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.oauth.{OAuthSignatureHelper, OAuthSignatureHelperConfig}
-import spray.json._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
-
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -58,15 +56,14 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
     }
   }
 
-  def jsonEntityHandler(entity: HttpEntity)(jsonHandlerFunction: JsValue => Unit) = {
+  def jsonEntityHandler(entity: HttpEntity)(jsonHandlerFunction: String => Unit) = {
     entity.contentType match {
       case ContentTypes.`application/json` =>
         val strictEntity = entity.toStrict(120.seconds)
         strictEntity onComplete {
           case Success(result) =>
             val resultString = result.getData().decodeString("UTF8")
-            val resultStringAST = resultString.parseJson
-            jsonHandlerFunction(resultStringAST)
+            jsonHandlerFunction(resultString)
           case Failure(ex) =>
             log.error(ex, "Error when reading from Json")
         }
