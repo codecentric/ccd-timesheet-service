@@ -6,8 +6,10 @@ lazy val root = (project in file(".")).
     scalaVersion := "2.11.8"
   )
 
-resolvers +=
-  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers ++= Seq(
+  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots",
+  Resolver.bintrayRepo("hseeberger", "maven")
+)
 
 // Project dependencies
 libraryDependencies ++= {
@@ -29,8 +31,6 @@ libraryDependencies ++= {
     // Data-access
     "io.getquill" %% "quill-core" % quillV,
     "io.getquill" %% "quill-cassandra" % quillV,
-    // Database drivers
-    "com.h2database" % "h2" % "1.4.192",
     // Testing
     "org.scalatest" %% "scalatest" % "2.2.6" % "test",
     "com.typesafe.akka" %% "akka-testkit" % akkaV,
@@ -41,7 +41,8 @@ libraryDependencies ++= {
     "io.circe" %% "circe-generic" % circeV,
     "io.circe" %% "circe-parser" % circeV,
     "io.circe" %% "circe-java8" % circeV,
-    "io.circe" %% "circe-jawn" % circeV
+    "io.circe" %% "circe-jawn" % circeV,
+    "de.heikoseeberger" %% "akka-http-circe" % "1.9.0"
   )
 }
 

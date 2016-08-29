@@ -12,8 +12,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.marshalling.xml.Unmarshallers
 import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
-import de.codecentric.ccdashboard.service.timesheet.messages.Start
+import de.codecentric.ccdashboard.service.timesheet.messages._
 import io.circe.generic.auto._
+import io.circe.java8.time._
 import io.circe.parser._
 
 import scala.concurrent.duration._
@@ -184,14 +185,4 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     Uri(scheme = jiraScheme, authority = jiraAuthority, path = path)
   }
 }
-
-case class TempoQueryTask()
-
-case class JiraUserQueryTask(iteration: Int, charIndex: Int)
-
-case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
-
-case class JiraTempoTeamQueryTask()
-
-case class JiraTempoTeamMembersQueryTask(teamId: Int)
 
