@@ -9,7 +9,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.pipe
 import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
-import de.codecentric.ccdashboard.service.timesheet.data.marshalling.xml.Unmarshallers
+import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
 import de.codecentric.ccdashboard.service.timesheet.messages._
@@ -79,7 +79,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       log.info(s"Using query: $queryUri")
 
       handleRequest(queryUri, signRequest = false, entity => {
-        implicit val um = Unmarshallers.jiraWorklogUnmarshaller
+        implicit val um = jiraWorklogUnmarshaller
         val worklogsFuture =
           Unmarshal(entity).to[Seq[JiraWorklog]]
             .map(_.map(_.toWorklog))

@@ -3,11 +3,18 @@ package de.codecentric.ccdashboard.service.timesheet.data
 import java.time._
 import java.util.Date
 
+import akka.http.scaladsl.model.HttpEntity
+import akka.http.scaladsl.unmarshalling.{Unmarshal, _}
+import akka.stream.Materializer
 import de.codecentric.ccdashboard.service.timesheet.data.model.Worklog
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira.JiraWorklog
 import io.circe.Encoder
 import io.circe.generic.semiauto._
 import io.circe.java8.time._
 import io.getquill.MappedEncoding
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.xml.XML
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -22,4 +29,14 @@ package object encoding {
 
   /* Encoders and decoders for Circe */
   implicit val worklogEncoder: Encoder[Worklog] = deriveEncoder
+
+  /* XML Marshallers */
+  val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[Seq[JiraWorklog]]() {
+    override def apply(value: HttpEntity)(implicit ec: ExecutionContext, materializer: Materializer): Future[Seq[JiraWorklog]] = {
+      Unmarshal(value).to[String].map(s => {
+        val xml = XML.loadString(s)
+        xml.child.map(JiraWorklog.fromXml)
+      })
+    }
+  }
 }
