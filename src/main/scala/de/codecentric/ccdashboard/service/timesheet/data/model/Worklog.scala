@@ -1,6 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.model
 
-import java.time.{LocalDate, LocalDateTime}
+import java.util.Date
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -13,8 +13,8 @@ final case class Worklog(worklogId: Int,
                          issueId: Int,
                          issueKey: String,
                          hours: Double,
-                         workDate: LocalDate,
-                         workDateTime: LocalDateTime,
+                         workDate: Date,
+                         workDateTime: Date,
                          username: String,
                          staffId: String,
                          billingKey: String,
@@ -25,16 +25,16 @@ final case class Worklog(worklogId: Int,
                          parentKey: Option[String],
                          reporterUserName: String,
                          externalId: String,
-                         externalTimestamp: Option[LocalDateTime],
+                         externalTimestamp: Option[Date],
                          externalHours: Double,
                          externalResult: String,
                          customField10084: Option[Double],
                          customField10100: String,
                          customField10406: Option[Double],
-                         customField10501: Option[LocalDateTime],
+                         customField10501: Option[Date],
                          hashValue: String
                         ) extends Workloggable {
   override def toWorklog: Worklog = this
 }
 
-final case class Worklogs(get: Seq[Worklog])
+final case class Worklogs(content: Seq[Worklog])

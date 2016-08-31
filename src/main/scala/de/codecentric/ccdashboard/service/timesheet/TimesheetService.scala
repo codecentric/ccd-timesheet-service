@@ -1,9 +1,14 @@
 package de.codecentric.ccdashboard.service.timesheet
 
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.util.Date
+
 import akka.actor.{ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
@@ -11,11 +16,12 @@ import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
-import de.codecentric.ccdashboard.service.timesheet.messages.{Start, WorklogQuery, WorklogQueryResult}
+import de.codecentric.ccdashboard.service.timesheet.messages._
+import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 import scala.io.StdIn
 import scala.util.{Failure, Success}
 
@@ -29,9 +35,7 @@ object TimesheetService extends App {
 
   // we need an ActorSystem to host our application in
   implicit val system = ActorSystem("timesheet-actor-system")
-
   implicit val materializer = ActorMaterializer()
-  // needed for the future flatMap/onComplete in the end
   implicit val executionContext = system.dispatcher
 
   val logger = Logging.getLogger(system, this)
@@ -44,13 +48,17 @@ object TimesheetService extends App {
   // Start importing
   dataImporter ! Start
 
-  println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-  StdIn.readLine() // let it run until user presses return
-  bindingFuture
-    .flatMap(_.unbind()) // trigger unbinding from the port
-    .onComplete(_ => system.terminate())
+  println(s"Server online at http://$interface:$port/")
 
-  // and shutdown when done
+  // let it run until user presses return
+  Future {
+    StdIn.readLine("Press [RETURN] to stop server")
+  }.onComplete { _ =>
+    logger.info("Shutting down TimesheetService by user request")
+    bindingFuture
+      .flatMap(_.unbind()) // trigger unbinding from the port
+      .onComplete(_ => system.terminate())
+  }
 
   /**
     * Defines the service endpoints
@@ -62,14 +70,39 @@ object TimesheetService extends App {
 
     implicit val timeout = Timeout(15.seconds)
 
-    path("getWorklogs") {
-      get {
-        val query = (dataProvider ? WorklogQuery(3)).mapTo[WorklogQueryResult]
-        onComplete(query) {
-          case Success(res) => complete(res.worklogs)
-          case Failure(ex) => complete(ex)
-        }
+    /* Akka HTTP Unmarshallers */
+    implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { ex => str =>
+      Future {
+        LocalDate.parse(str)
       }
+    }
+
+    implicit val dateUnmarshaller = Unmarshaller[String, Date] { ex => str =>
+      Future {
+        new SimpleDateFormat("yyyy-MM-dd").parse(str)
+      }
+    }
+
+    pathPrefix("user" / usernameMatcher) { username =>
+      logger.info(s"Username ist: $username")
+      pathEndOrSingleSlash {
+        val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
+        onComplete(query) {
+          case Success(res) => complete(res.user)
+          case Failure(ex) => failWith(ex)
+        }
+      } ~
+        path("worklog") {
+          get {
+            parameters('from.as[Date].?, 'to.as[Date].?) { (from, to) =>
+              val query = (dataProvider ? WorklogQuery(username, from, to)).mapTo[WorklogQueryResult]
+              onComplete(query) {
+                case Success(res) => complete(res.worklogs)
+                case Failure(ex) => failWith(ex)
+              }
+            }
+          }
+        }
     }
   }
 }

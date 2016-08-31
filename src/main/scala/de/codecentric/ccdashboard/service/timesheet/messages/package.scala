@@ -1,6 +1,8 @@
 package de.codecentric.ccdashboard.service.timesheet
 
-import de.codecentric.ccdashboard.service.timesheet.data.model.Worklog
+import java.util.Date
+
+import de.codecentric.ccdashboard.service.timesheet.data.model.{User, Worklog}
 
 /**
   * Collection of all message and query classes used in communication between the actors
@@ -17,10 +19,8 @@ package object messages {
   /* Query messages */
   /**
     * Query for worklogs
-    *
-    * @param x Number of results to return
     */
-  case class WorklogQuery(x: Int)
+  case class WorklogQuery(username: String, from: Option[Date], to: Option[Date])
 
   /**
     * Query for worklogs response
@@ -29,9 +29,19 @@ package object messages {
     */
   case class WorklogQueryResult(worklogs: Seq[Worklog])
 
+  /**
+    * Query for a user
+    */
+  case class UserQuery(username: String)
+
+  /**
+    * Query for user response
+    */
+  case class UserQueryResult(user: Option[User])
+
   /* TODO: describe tasks */
 
-  case class TempoQueryTask()
+  case class TempoWorklogQueryTask()
 
   case class JiraUserQueryTask(iteration: Int, charIndex: Int)
 

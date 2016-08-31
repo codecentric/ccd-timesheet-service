@@ -10,11 +10,10 @@ import akka.pattern.pipe
 import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
-import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Users, Worklogs}
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import io.circe.generic.auto._
-import io.circe.java8.time._
 import io.circe.parser._
 
 import scala.concurrent.duration._
@@ -57,14 +56,14 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       * Perform startup and send initial request
       */
     case Start =>
-      // Start Tempo Query async
-      context.system.scheduler.scheduleOnce(1.seconds, self, TempoQueryTask)
+      // Start Tempo Worklog Query async
+      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask)
 
-    // Start Jira Queries async
-    //context.system.scheduler.scheduleOnce(0.seconds, self, JiraUserQueryTask(0, 0))
+      // Start Jira User Queries async
+      context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask(0, 0))
 
-    // Query one issue
-    // context.system.scheduler.scheduleOnce(5.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
+      // Query one issue
+      context.system.scheduler.scheduleOnce(2.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
 
     // Query tempo teams
     //context.system.scheduler.scheduleOnce(10.seconds, self, JiraTempoTeamQueryTask)
@@ -72,7 +71,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     // Query one tempo team
     //context.system.scheduler.scheduleOnce(15.seconds, self, JiraTempoTeamMembersQueryTask(15))
 
-    case TempoQueryTask =>
+    case TempoWorklogQueryTask =>
       log.info("Tempo query task received.")
 
       val queryUri = getWorklogRequestUri(importStartDate, importEndDate)
@@ -89,7 +88,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       })
 
     case JiraUserQueryTask(iteration, charIndex) =>
-      log.info("Jira query task received.")
+      log.info("Jira user query task received.")
 
       val currentChar = alphabet(charIndex)
       val uri = getJiraUsersRequestUri(currentChar)
@@ -97,9 +96,10 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(uri, signRequest = true, jsonEntityHandler(_)(jsonString => {
         decode[Seq[JiraUser]](jsonString) match {
           case Xor.Left(error) => println(error)
-          case Xor.Right(users) =>
-            log.info(s"Received ${users.size} user")
-            // TODO store to database using writerActor
+          case Xor.Right(jiraUsers) =>
+            log.info(s"Received ${jiraUsers.size} user")
+            val users = jiraUsers.map(_.toUser)
+            dataWriter ! Users(users)
 
             if (charIndex == alphabet.size - 1) {
               log.info("Scheduling new iteration in 3600 seconds")
@@ -117,7 +117,10 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
         decode[JiraIssue](jsonString) match {
           case Xor.Left(error) => println(error)
-          case Xor.Right(jiraIssue) => println(jiraIssue)
+          case Xor.Right(jiraIssue) => {
+            val issue = jiraIssue.toIssue
+            dataWriter ! issue
+          }
         }
       }))
 

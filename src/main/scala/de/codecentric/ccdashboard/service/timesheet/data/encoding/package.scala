@@ -1,16 +1,18 @@
 package de.codecentric.ccdashboard.service.timesheet.data
 
+import java.text.{DateFormat, ParseException}
 import java.time._
 import java.util.Date
 
 import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.unmarshalling.{Unmarshal, _}
 import akka.stream.Materializer
-import de.codecentric.ccdashboard.service.timesheet.data.model.Worklog
+import cats.data.Xor
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira.JiraWorklog
-import io.circe.Encoder
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
+import io.circe.{Encoder, _}
 import io.circe.generic.semiauto._
-import io.circe.java8.time._
+import io.circe.syntax._
 import io.getquill.MappedEncoding
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -27,8 +29,26 @@ package object encoding {
   implicit val localDateEncoder = MappedEncoding[LocalDate, Date](ld => Date.from(ld.atStartOfDay(ZoneId.systemDefault()).toInstant))
   implicit val localDateDecoder = MappedEncoding[Date, LocalDate](date => Instant.ofEpochMilli(date.getTime).atZone(ZoneId.systemDefault()).toLocalDate)
 
+  implicit val stringMapEncoder = MappedEncoding[Map[String, String], String](map => map.asJson.noSpaces)
+  implicit val stringMapMapEncoder = MappedEncoding[Map[String, Map[String, Option[String]]], String](map => map.asJson.noSpaces)
+  implicit val stringTupleEncoder = MappedEncoding[(String, String), String](t => t.toString)
+
   /* Encoders and decoders for Circe */
+  implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
+    Json.fromString(DateFormat.getDateInstance.format(date))
+  )
+
+  implicit val decodeDate: Decoder[Date] = Decoder.instance(c =>
+    c.as[String].flatMap { s =>
+      try Xor.right(DateFormat.getDateInstance.parse(s)) catch {
+        case _: ParseException => Xor.left(DecodingFailure("Date", c.history))
+      }
+    }
+  )
+
   implicit val worklogEncoder: Encoder[Worklog] = deriveEncoder
+
+  implicit val issueEncoder: Encoder[Issue] = deriveEncoder
 
   /* XML Marshallers */
   val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[Seq[JiraWorklog]]() {

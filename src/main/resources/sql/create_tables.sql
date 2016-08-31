@@ -1,3 +1,5 @@
+-- noinspection SqlNoDataSourceInspectionForFile
+-- noinspection SqlDialectInspectionForFile
 # noinspection SqlNoDataSourceInspectionForFile
 CREATE TABLE worklog (
   worklog_id         INT,
@@ -24,5 +26,30 @@ CREATE TABLE worklog (
   custom_field10406  DOUBLE,
   custom_field10501  TIMESTAMP,
   hash_value         TEXT,
-  PRIMARY KEY (username, worklog_id)
+  PRIMARY KEY (username, work_date)
+);
+
+CREATE TABLE user (
+  self          TEXT,
+  userkey       TEXT,
+  name          TEXT,
+  email_address TEXT,
+  avatar_url    TEXT,
+  display_name  TEXT,
+  active        BOOLEAN,
+  time_zone     TEXT,
+  locale        TEXT,
+  PRIMARY KEY (userkey)
+);
+
+CREATE TABLE issue (
+  id            TEXT,
+  issue_key     TEXT,
+  issue_url     TEXT,
+  summary       TEXT,
+  components    MAP<TEXT, TEXT>,
+  custom_fields FROZEN<MAP<TEXT, MAP<TEXT, TEXT>>>,
+  issue_type    MAP<TEXT, TEXT>,
+  PRIMARY KEY (id)
+);
 )

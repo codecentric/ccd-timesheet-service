@@ -3,6 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.model.jira
 import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
 
+import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 
 import scala.xml.Node
@@ -32,11 +33,19 @@ case class JiraWorklog(worklogId: Int,
                        customField10501: Option[LocalDateTime],
                        hashValue: String) extends Workloggable {
 
-  override def toWorklog = Worklog(
-    worklogId, issueId, issueKey, hours, workDate, workDateTime, username, staffId, billingKey, billingAttributes,
-    activityId, activityName, workDescription, parentKey, reporterUserName, externalId, externalTimestamp,
-    externalHours, externalResult, customField10084, customField10100, customField10406, customField10501, hashValue
-  )
+  override def toWorklog = {
+    // experimental
+    val workDateDate = localDateEncoder.f(workDate)
+    val workDateTimeDate = localDateTimeEncoder.f(workDateTime)
+    val externalTimestampDate = externalTimestamp.map(localDateTimeEncoder.f)
+    val customField10501Date = customField10501.map(localDateTimeEncoder.f)
+
+    Worklog(
+      worklogId, issueId, issueKey, hours, workDateDate, workDateTimeDate, username, staffId, billingKey, billingAttributes,
+      activityId, activityName, workDescription, parentKey, reporterUserName, externalId, externalTimestampDate,
+      externalHours, externalResult, customField10084, customField10100, customField10406, customField10501Date, hashValue
+    )
+  }
 }
 
 // extends Workloggable {
