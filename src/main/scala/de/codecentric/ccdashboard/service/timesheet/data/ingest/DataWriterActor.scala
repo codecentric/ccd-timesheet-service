@@ -61,7 +61,7 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
         //val tupl = Metadata.
 
         //val tuple = TupleType.of(DataType.text(), DataType.text()).newValue(i.issuetype._1, i.issuetype._2)
-        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, i.customFields.asJava, i.issuetype.asJava)
+        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, i.customFields.asJava, i.issueType.asJava)
       })
 
     case x => log.warning(s"Received unknown message: $x")

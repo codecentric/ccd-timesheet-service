@@ -8,8 +8,8 @@ final case class Issue(id: String,
                        issueUrl: String,
                        summary: Option[String],
                        components: Map[String, String],
-                       customFields: Map[String, Map[String, Option[String]]],
-                       issuetype: Map[String, String]) extends Issueable {
+                       customFields: Map[String, Map[String, String]],
+                       issueType: Map[String, String]) extends Issueable {
   override def toIssue: Issue = this
 }
 

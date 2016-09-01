@@ -103,6 +103,15 @@ object TimesheetService extends App {
             }
           }
         }
-    }
+    } ~
+      pathPrefix("issue" / issueIdMatcher) { id =>
+        pathEndOrSingleSlash {
+          val query = (dataProvider ? IssueQuery(id)).mapTo[IssueQueryResult]
+          onComplete(query) {
+            case Success(res) => complete(res.issue)
+            case Failure(ex) => failWith(ex)
+          }
+        }
+      }
   }
 }

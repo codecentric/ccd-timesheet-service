@@ -5,4 +5,5 @@ package de.codecentric.ccdashboard.service.timesheet.routing
   */
 object CustomPathMatchers {
   val usernameMatcher = """[A-Za-z\.]+""".r
+  val issueIdMatcher = """[A-Za-z0-9]+""".r
 }

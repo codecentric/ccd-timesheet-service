@@ -15,6 +15,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.model.{Users, Worklogs}
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import io.circe.generic.auto._
 import io.circe.parser._
+import io.circe.java8.time._
 
 import scala.concurrent.duration._
 
@@ -117,10 +118,9 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
         decode[JiraIssue](jsonString) match {
           case Xor.Left(error) => println(error)
-          case Xor.Right(jiraIssue) => {
+          case Xor.Right(jiraIssue) =>
             val issue = jiraIssue.toIssue
             dataWriter ! issue
-          }
         }
       }))
 

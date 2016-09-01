@@ -10,9 +10,10 @@ import akka.stream.Materializer
 import cats.data.Xor
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira.JiraWorklog
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
-import io.circe.{Encoder, _}
 import io.circe.generic.semiauto._
+import io.circe.parser._
 import io.circe.syntax._
+import io.circe.{Encoder, _}
 import io.getquill.MappedEncoding
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -30,7 +31,20 @@ package object encoding {
   implicit val localDateDecoder = MappedEncoding[Date, LocalDate](date => Instant.ofEpochMilli(date.getTime).atZone(ZoneId.systemDefault()).toLocalDate)
 
   implicit val stringMapEncoder = MappedEncoding[Map[String, String], String](map => map.asJson.noSpaces)
-  implicit val stringMapMapEncoder = MappedEncoding[Map[String, Map[String, Option[String]]], String](map => map.asJson.noSpaces)
+  implicit val stringMapDecoder = MappedEncoding[String, Map[String, String]](str => {
+    decode[Map[String, String]](str) match {
+      case Xor.Left(ex) => throw ex
+      case Xor.Right(map) => map
+    }
+  })
+  implicit val stringMapMapEncoder = MappedEncoding[Map[String, Map[String, String]], String](map => map.asJson.noSpaces)
+  implicit val stringMapMapDecoder = MappedEncoding[String, Map[String, Map[String, String]]](str => {
+    decode[Map[String, Map[String, String]]](str) match {
+      case Xor.Left(ex) => throw ex
+      case Xor.Right(map) => map
+    }
+  })
+
   implicit val stringTupleEncoder = MappedEncoding[(String, String), String](t => t.toString)
 
   /* Encoders and decoders for Circe */
@@ -49,6 +63,8 @@ package object encoding {
   implicit val worklogEncoder: Encoder[Worklog] = deriveEncoder
 
   implicit val issueEncoder: Encoder[Issue] = deriveEncoder
+
+  case class JiraTempoTeamMemberUser(name: String)
 
   /* XML Marshallers */
   val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[Seq[JiraWorklog]]() {

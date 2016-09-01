@@ -16,8 +16,8 @@ case class JiraIssue(id: String, key: String, self: String, fields: JiraIssueFie
   override def toIssue: Issue = {
     val components = fields.components.map(c => c.id -> c.name).toMap
 
-    val f1 = fields.customfield_10084.map(s => "customfield_10084" -> Map(s -> None))
-    val f2 = fields.customfield_12300.map(f => "customfield_12300" -> Map(f.id -> Some(f.value)))
+    val f1 = fields.customfield_10084.map(s => "customfield_10084" -> Map(s -> ""))
+    val f2 = fields.customfield_12300.map(f => "customfield_12300" -> Map(f.id -> f.value))
     val customFieldsMap = Seq(f1, f2).flatten.toMap
 
     Issue(id, key, self, fields.summary, components, customFieldsMap, JiraIssueFieldIssueType.unapply(fields.issuetype).toMap)
