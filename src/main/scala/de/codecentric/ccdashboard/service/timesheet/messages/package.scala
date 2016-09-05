@@ -61,6 +61,6 @@ package object messages {
 
   case class JiraTempoTeamQueryTask()
 
-  case class JiraTempoTeamMembersQueryTask(teamId: Int)
+  case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
 
 }

@@ -39,15 +39,12 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
     })
   }
 
-
   def receive = {
-    case w: Worklogs =>
-      val worklogs = w.content.toList
+    case Worklogs(worklogs) =>
       log.info(s"Received ${worklogs.size} worklogs to store")
       ctx.run(insertWorklogs(worklogs))
 
-    case u: Users =>
-      val users = u.content.toList
+    case Users(users) =>
       log.info(s"Received ${users.size} users to store")
       ctx.run(insertUsers(users))
 
@@ -56,13 +53,32 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
       log.info(s"Received one issue to store")
 
       ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, components, custom_fields, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?)", (s) => {
-        val componentsString = stringMapEncoder.f(i.components)
-        val customFieldsString = stringMapMapEncoder.f(i.customFields)
-        //val tupl = Metadata.
+        //val componentsString = stringMapEncoder.f(i.components)
+        //val customFieldsString = stringMapMapEncoder.f(i.customFields)
 
-        //val tuple = TupleType.of(DataType.text(), DataType.text()).newValue(i.issuetype._1, i.issuetype._2)
         s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, i.customFields.asJava, i.issueType.asJava)
       })
+
+    case Teams(teams) =>
+      log.info(s"Received ${teams.size} teams to store")
+      teams.foreach(team =>
+        ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
+          st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
+        ))
+
+    case TeamMemberships(teamId, members) =>
+      log.info(s"Received ${members.size} members for team $teamId to store")
+    // TODO: insert members here as map into table team
+    /*     val membersMap = members.map {
+           case TeamMember(name, date) => name -> date
+         }.toMap.
+
+           ctx.executeAction("INSERT INTO team (members) VALUES (?) WHERE id = ?", (st) =>
+           st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
+         ))
+   */
+
+
 
     case x => log.warning(s"Received unknown message: $x")
   }

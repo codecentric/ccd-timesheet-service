@@ -2,6 +2,7 @@ package de.codecentric.ccdashboard.service.timesheet.data
 
 import java.text.{DateFormat, ParseException}
 import java.time._
+import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.util.Date
 
 import akka.http.scaladsl.model.HttpEntity
@@ -49,13 +50,16 @@ package object encoding {
 
   /* Encoders and decoders for Circe */
   implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
-    Json.fromString(DateFormat.getDateInstance.format(date))
+    Json.fromString(DateTimeFormatter.ISO_DATE.format(date.toInstant))
   )
 
-  implicit val decodeDate: Decoder[Date] = Decoder.instance(c =>
+  implicit val decodeDate: Decoder[Option[Date]] = Decoder.instance(c =>
     c.as[String].flatMap { s =>
-      try Xor.right(DateFormat.getDateInstance.parse(s)) catch {
-        case _: ParseException => Xor.left(DecodingFailure("Date", c.history))
+      if ("" == s) Xor.right(None)
+      else {
+        try Xor.right(Some(localDateEncoder.f(LocalDate.from(DateTimeFormatter.ISO_DATE.parse(s))))) catch {
+          case ex: DateTimeParseException => Xor.left(DecodingFailure("Could not parse Date", c.history))
+        }
       }
     }
   )
@@ -64,15 +68,13 @@ package object encoding {
 
   implicit val issueEncoder: Encoder[Issue] = deriveEncoder
 
-  case class JiraTempoTeamMemberUser(name: String)
-
   /* XML Marshallers */
-  val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[Seq[JiraWorklog]]() {
-    override def apply(value: HttpEntity)(implicit ec: ExecutionContext, materializer: Materializer): Future[Seq[JiraWorklog]] = {
+  val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[List[JiraWorklog]]() {
+    override def apply(value: HttpEntity)(implicit ec: ExecutionContext, materializer: Materializer): Future[List[JiraWorklog]] = {
       Unmarshal(value).to[String].map(s => {
         val xml = XML.loadString(s)
         xml.child.map(JiraWorklog.fromXml)
-      })
+      }.toList)
     }
   }
 }

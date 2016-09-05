@@ -20,4 +20,4 @@ trait Userable {
   def toUser: User
 }
 
-final case class Users(content: Seq[User])
+final case class Users(content: List[User])

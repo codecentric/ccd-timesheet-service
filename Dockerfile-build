@@ -1,0 +1,15 @@
+FROM hseeberger/scala-sbt
+
+MAINTAINER Björn Jacobs <bjoern.jacobs@codecentric.de>
+
+CMD sbt clean universal:packageBin
+
+#
+# COPY ./settings.xml /conf/settings.xml
+
+# CMD mvn -s /conf/settings.xml clean versions:set -DnewVersion=${BUILD_NUMBER} -U && mvn -s /conf/settings.xml clean deploy -DaltDeploymentRepository=nexus-release-repository::default::${REPO_URL}/content/repositories/releases/ -U
+
+# Version: ${BUILD_NUMBER}
+# ${env.REPO_USERNAME}
+# ${env.REPO_PASSWORD}
+# Repo: nexus-release-repository::default::${REPO_URL}/content/repositories/releases/

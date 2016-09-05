@@ -1,5 +1,6 @@
 // Basic project configuration
 lazy val root = (project in file(".")).
+  enablePlugins(JavaAppPackaging).
   settings(
     name := "ccd-timesheet-service",
     version := "0.0.1-SNAPSHOT",
@@ -45,5 +46,4 @@ libraryDependencies ++= {
     "de.heikoseeberger" %% "akka-http-circe" % "1.9.0"
   )
 }
-
 //mainClass in (Compile, run) := Some("de.codecentric.ccdashboard.service.timesheet.dataimport.ImportTest")

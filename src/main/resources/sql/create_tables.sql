@@ -52,4 +52,12 @@ CREATE TABLE issue (
   issue_type    MAP<TEXT, TEXT>,
   PRIMARY KEY (id)
 );
-)
+
+CREATE TABLE team (
+  id      INT,
+  name    TEXT,
+  members MAP<TEXT, TIMESTAMP>,
+  PRIMARY KEY(id)
+);
+
+CREATE INDEX ON team (KEYS(members));

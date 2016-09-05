@@ -11,8 +11,8 @@ import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Users, Worklogs}
-import de.codecentric.ccdashboard.service.timesheet.messages._
+import de.codecentric.ccdashboard.service.timesheet.data.model.{TeamMemberships, Teams, Users, Worklogs}
+import de.codecentric.ccdashboard.service.timesheet.messages.{JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.java8.time._
@@ -66,11 +66,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       // Query one issue
       context.system.scheduler.scheduleOnce(2.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
 
-    // Query tempo teams
-    //context.system.scheduler.scheduleOnce(10.seconds, self, JiraTempoTeamQueryTask)
-
-    // Query one tempo team
-    //context.system.scheduler.scheduleOnce(15.seconds, self, JiraTempoTeamMembersQueryTask(15))
+      // Query tempo teams
+      context.system.scheduler.scheduleOnce(1.seconds, self, JiraTempoTeamQueryTask)
 
     case TempoWorklogQueryTask =>
       log.info("Tempo query task received.")
@@ -81,7 +78,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(queryUri, signRequest = false, entity => {
         implicit val um = jiraWorklogUnmarshaller
         val worklogsFuture =
-          Unmarshal(entity).to[Seq[JiraWorklog]]
+          Unmarshal(entity).to[List[JiraWorklog]]
             .map(_.map(_.toWorklog))
             .map(Worklogs)
 
@@ -95,7 +92,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       val uri = getJiraUsersRequestUri(currentChar)
 
       handleRequest(uri, signRequest = true, jsonEntityHandler(_)(jsonString => {
-        decode[Seq[JiraUser]](jsonString) match {
+        decode[List[JiraUser]](jsonString) match {
           case Xor.Left(error) => println(error)
           case Xor.Right(jiraUsers) =>
             log.info(s"Received ${jiraUsers.size} user")
@@ -130,21 +127,35 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
         decode[Seq[JiraTempoTeam]](jsonString) match {
           case Xor.Left(error) => println(error)
-          case Xor.Right(jiraTempoTeams) => println(jiraTempoTeams)
+          case Xor.Right(jiraTempoTeams) => {
+            dataWriter ! Teams(jiraTempoTeams.map(_.toTeam).toList)
+            val teamIds = jiraTempoTeams.map(_.id).toList
+            self ! JiraTempoTeamMembersQueryTask(teamIds)
+          }
         }
       }))
 
-    case JiraTempoTeamMembersQueryTask(teamId) =>
+    case JiraTempoTeamMembersQueryTask((teamId :: remainingTeamIds)) =>
       log.info("Jira Tempo Team Members task received.")
       val queryUri = getJiraTempoTeamMembersUri(teamId)
       log.info(s"Using query URI: $queryUri")
       handleRequest(queryUri, signRequest = true, jsonEntityHandler(_)(jsonString => {
         decode[Seq[JiraTempoTeamMember]](jsonString) match {
           case Xor.Left(error) => println(error)
-          case Xor.Right(jiraTempoTeamMembers) => println(jiraTempoTeamMembers)
+          case Xor.Right(jiraTempoTeamMembers) => {
+            // Inject teamId after parsing since response does not contain it
+            val teamMembers = jiraTempoTeamMembers.map(_.toTeamMember).toList
+            dataWriter ! TeamMemberships(teamId, teamMembers)
+          }
         }
-        //val teamMembers = jsonAST.convertTo[Seq[JiraTempoTeamMember]]
-        //teamMembers.foreach(println)
+
+        if (remainingTeamIds.isEmpty) {
+          log.info("Scheduling next Teams query iteration in 3600 seconds")
+          context.system.scheduler.scheduleOnce(3600.seconds, self, JiraTempoTeamQueryTask)
+        } else {
+          log.info(s"Scheduling team query for next team in 10 seconds")
+          context.system.scheduler.scheduleOnce(10.seconds, self, JiraTempoTeamMembersQueryTask(remainingTeamIds))
+        }
       }))
   }
 
