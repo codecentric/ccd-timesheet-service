@@ -13,7 +13,6 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
   import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 
   val dbConfigKey = conf.getString("timesheet-service.database-config-key")
-  val worklogTableName = conf.getString("timesheet-service.tablenames.worklogs")
 
   lazy val ctx = new CassandraSyncContext[SnakeCase](dbConfigKey)
 

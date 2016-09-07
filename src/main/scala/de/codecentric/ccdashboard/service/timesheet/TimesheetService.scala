@@ -4,7 +4,7 @@ import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.util.Date
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives
@@ -13,7 +13,7 @@ import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
-import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
+import de.codecentric.ccdashboard.service.timesheet.data.access._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
 import de.codecentric.ccdashboard.service.timesheet.messages._
@@ -21,8 +21,7 @@ import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
 
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
-import scala.io.StdIn
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /**
@@ -40,30 +39,46 @@ object TimesheetService extends App {
 
   val logger = Logging.getLogger(system, this)
 
-  // create and start our main actors and components
-  val dataImporter = system.actorOf(Props(new DataIngestActor(conf)), "data-importer")
-  val dataProvider = system.actorOf(Props(new DataProviderActor(conf)), "data-provider")
-  val bindingFuture = Http().bindAndHandle(route, interface, port)
+  // try to acquire connection to database and perform initialization
+  implicit val timeout = Timeout(60.minutes)
 
-  // Start importing
-  dataImporter ! Start
+  val databaseInitializer = system.actorOf(Props(new DatabaseInitializerActor(conf)), "database-initializer")
+  val responseFuture = (databaseInitializer ? InitDatabaseConnection).mapTo[InitDatabaseConnectionResponse]
 
-  println(s"Server online at http://$interface:$port/")
+  val response = Await.ready(responseFuture, Duration.Inf)
+  val httpServerBinding = startUp
 
-  // let it run until user presses return
-  Future {
-    StdIn.readLine("Press [RETURN] to stop server")
-  }.onComplete { _ =>
-    logger.info("Shutting down TimesheetService by user request")
+  sys.addShutdownHook({
+    logger.info("*** Shutting down ***")
+    httpServerBinding.flatMap(_.unbind())
+    val termination = system.terminate()
+    Await.ready(termination, 10.seconds)
+  })
+
+  /**
+    * Main start-up function that creates the ActorSystem and Actors
+    *
+    * @param ec
+    * @param materializer
+    */
+  def startUp(implicit ec: ExecutionContext, materializer: Materializer) = {
+    // create and start our main actors and components
+    val dataImporter = system.actorOf(Props(new DataIngestActor(conf)), "data-importer")
+    val dataProvider = system.actorOf(Props(new DataProviderActor(conf)), "data-provider")
+    val bindingFuture = Http().bindAndHandle(route(dataProvider), interface, port)
+
+    // Start importing
+    dataImporter ! Start
+
+    logger.info(s"Server online at http://$interface:$port/")
+
     bindingFuture
-      .flatMap(_.unbind()) // trigger unbinding from the port
-      .onComplete(_ => system.terminate())
   }
 
   /**
     * Defines the service endpoints
     */
-  def route(implicit ec: ExecutionContext, materializer: Materializer) = {
+  def route(dataProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer) = {
     import CirceSupport._
     import Directives._
     import io.circe.generic.auto._

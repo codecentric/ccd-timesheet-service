@@ -1,0 +1,19 @@
+version: '2'
+services:
+  timesheet-service:
+    image: ccd-timesheet-service
+    ports:
+     - "18082:8080"
+    links:
+     - cassandra:cassandra
+
+  cassandra:
+    image: cassandra:3
+    expose:
+      - "9042"
+    volumes:
+      - data:/var/lib/cassandra
+
+volumes:
+  data:
+    driver: local

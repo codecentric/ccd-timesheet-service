@@ -16,8 +16,8 @@ resolvers ++= Seq(
 // Project dependencies
 libraryDependencies ++= {
   val akkaV = "2.4.9"
-  val circeV = "0.5.0-M3"
-  val quillV = "0.9.1-SNAPSHOT"
+  val circeV = "0.5.1"
+  val quillV = "0.10.0"
 
 
   Seq(
@@ -48,7 +48,10 @@ libraryDependencies ++= {
   )
 }
 
+import NativePackagerHelper._
 // Packaging settings
 mainClass in Compile := Some("de.codecentric.ccdashboard.service.timesheet.TimesheetService")
 topLevelDirectory := None
 packageName in Universal := "ccd-timesheet-service"
+
+// mappings in Universal ++= directory("src/main/resources/sql")

@@ -57,6 +57,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       * Perform startup and send initial request
       */
     case Start =>
+      log.info("Received Start message")
       // Start Tempo Worklog Query async
       context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask)
 
