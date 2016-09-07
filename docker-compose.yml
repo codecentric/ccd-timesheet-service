@@ -3,7 +3,7 @@ services:
   timesheet-service:
     image: ccd-timesheet-service
     ports:
-     - "18082:8080"
+     - "10005:8080"
     links:
      - cassandra:cassandra
 
