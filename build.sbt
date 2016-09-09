@@ -15,7 +15,7 @@ resolvers ++= Seq(
 
 // Project dependencies
 libraryDependencies ++= {
-  val akkaV = "2.4.9"
+  val akkaV = "2.4.10"
   val circeV = "0.5.1"
   val quillV = "0.10.0"
 
