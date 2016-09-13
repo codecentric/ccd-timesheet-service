@@ -8,9 +8,11 @@ services:
   timesheet-service:
     image: ccd-timesheet-service
     ports:
-     - "10005:8080"
+      - "10005:8080"
     networks:
-       - ccdashboardplatform_prodnetwork
+      - ccdashboardplatform_prodnetwork
+    links:
+      - cassandra:cassandra
   cassandra:
     image: cassandra:3
     expose:
