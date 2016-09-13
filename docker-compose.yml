@@ -1,16 +1,22 @@
 version: '2'
+
+networks:
+  ccdashboardplatform_prodnetwork:
+    external: true
+
 services:
   timesheet-service:
     image: ccd-timesheet-service
     ports:
      - "10005:8080"
-    links:
-     - cassandra:cassandra
-
+    networks:
+       - ccdashboardplatform_prodnetwork
   cassandra:
     image: cassandra:3
     expose:
       - "9042"
+    networks:
+      - ccdashboardplatform_prodnetwork
     volumes:
       - data:/var/lib/cassandra
 
