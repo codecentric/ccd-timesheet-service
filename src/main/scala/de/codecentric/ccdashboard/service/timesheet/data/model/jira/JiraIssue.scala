@@ -12,11 +12,12 @@ import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Issueable
   * @param self   URL pointing to this issue in JIRA
   * @param fields Specific fields of this issue
   */
+
 case class JiraIssue(id: String, key: String, self: String, fields: JiraIssueFields) extends Issueable {
   override def toIssue: Issue = {
     val components = fields.components.map(c => c.id -> c.name).toMap
 
-    val f1 = fields.customfield_10084.map(s => "customfield_10084" -> Map(s -> ""))
+    val f1 = fields.customfield_10084.map(s => "customfield_10084" -> Map("customfield_10084_value" -> s.value.getOrElse("")))
     val f2 = fields.customfield_12300.map(f => "customfield_12300" -> Map(f.id -> f.value))
     val customFieldsMap = Seq(f1, f2).flatten.toMap
 
@@ -27,10 +28,12 @@ case class JiraIssue(id: String, key: String, self: String, fields: JiraIssueFie
 case class JiraIssueFields(summary: Option[String],
                            components: Seq[JiraIssueFieldComponents],
                            customfield_12300: Option[JiraIssueFieldCustomField12300],
-                           customfield_10084: Option[String],
+                           customfield_10084: Option[JiraIssueFieldCustomField10084],
                            issuetype: JiraIssueFieldIssueType)
 
 case class JiraIssueFieldComponents(id: String, name: String)
+
+case class JiraIssueFieldCustomField10084(value: Option[String])
 
 case class JiraIssueFieldCustomField12300(value: String, id: String)
 

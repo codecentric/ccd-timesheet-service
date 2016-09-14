@@ -1,5 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet
 
+import java.time.LocalDate
 import java.util.Date
 
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, User, Worklog}
@@ -53,7 +54,7 @@ package object messages {
 
   /* TODO: describe tasks */
 
-  case class TempoWorklogQueryTask()
+  case class TempoWorklogQueryTask(toDate: LocalDate, fromDate: LocalDate, syncing: Boolean)
 
   case class JiraUserQueryTask(iteration: Int, charIndex: Int)
 

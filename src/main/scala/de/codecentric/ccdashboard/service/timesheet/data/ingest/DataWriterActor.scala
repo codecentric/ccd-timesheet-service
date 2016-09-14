@@ -54,8 +54,11 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
       ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, components, custom_fields, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?)", (s) => {
         //val componentsString = stringMapEncoder.f(i.components)
         //val customFieldsString = stringMapMapEncoder.f(i.customFields)
+        val customFieldsMap = i.customFields.map {
+          case (k, v) => k -> v.asJava
+        }.asJava
 
-        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, i.customFields.asJava, i.issueType.asJava)
+        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, customFieldsMap, i.issueType.asJava)
       })
 
     case Teams(teams) =>

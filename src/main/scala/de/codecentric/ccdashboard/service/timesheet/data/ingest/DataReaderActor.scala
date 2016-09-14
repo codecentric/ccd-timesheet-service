@@ -3,12 +3,14 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
+import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.oauth.{OAuthSignatureHelper, OAuthSignatureHelperConfig}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -17,19 +19,27 @@ import scala.util.{Failure, Success}
 trait DataReaderActor extends Actor with ActorLogging
 
 abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderActor {
+
+  protected def scheme: String
+
+  protected def host: String
+
+  protected def authority: Uri.Authority
+
+  protected def getOAuthConfig: Option[Config]
+
   import context.dispatcher
 
-  val http = Http(context.system)
-  final implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
+  lazy val connectionFlow: Flow[HttpRequest, HttpResponse, Future[Http.OutgoingConnection]] = Http(context.system).outgoingConnectionHttps(host)
 
-  def getOAuthConfig: Option[Config]
+  final implicit val materializer: ActorMaterializer = ActorMaterializer(ActorMaterializerSettings(context.system))
 
   lazy val oAuthSigHelper = getOAuthConfig.flatMap(conf => {
     val oAuthConfig = OAuthSignatureHelperConfig.fromConfig(conf)
     Some(new OAuthSignatureHelper(oAuthConfig))
   })
 
-  def handleRequest(uri: Uri, signRequest: Boolean = false, entityHandler: HttpEntity => Unit) = {
+  def handleRequest(uri: Uri, signRequest: Boolean = false, successEntityHandler: HttpEntity => Unit, failureHandler: Throwable => Unit) = Try {
     log.info(s"Using URI: $uri")
     val httpRequest = HttpRequest(method = HttpMethods.GET, uri = uri)
 
@@ -42,17 +52,18 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
         throw new IllegalArgumentException(msg)
     }
 
-    val requestFuture = http.singleRequest(optSignedRequest)
+    val requestFuture = Source.single(optSignedRequest).via(connectionFlow).runWith(Sink.head)
 
-    requestFuture onComplete {
+    requestFuture.onComplete {
       case Success(response) => response match {
         case HttpResponse(StatusCodes.OK, headers, entity, _) =>
-          entityHandler(entity)
+          successEntityHandler(entity)
         case HttpResponse(code, _, _, _) =>
-          log.error("Request failed, response code: " + code)
+          val exception = new RuntimeException(s"Response code was not 404 OK but: $code")
+          failureHandler(exception)
       }
       case Failure(ex) =>
-        log.error(s"Request produced exception: ${ex.getStackTrace}")
+        failureHandler(ex)
     }
   }
 

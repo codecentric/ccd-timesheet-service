@@ -1,6 +1,5 @@
 package de.codecentric.ccdashboard.service.timesheet.data
 
-import java.text.{DateFormat, ParseException}
 import java.time._
 import java.time.format.{DateTimeFormatter, DateTimeParseException}
 import java.util.Date
@@ -9,8 +8,9 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.unmarshalling.{Unmarshal, _}
 import akka.stream.Materializer
 import cats.data.Xor
-import de.codecentric.ccdashboard.service.timesheet.data.model.jira.JiraWorklog
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira.{JiraIssueFieldCustomField10084, JiraWorklog}
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
+import io.circe.Decoder.Result
 import io.circe.generic.semiauto._
 import io.circe.parser._
 import io.circe.syntax._
@@ -63,6 +63,20 @@ package object encoding {
       }
     }
   )
+
+  implicit final val decodeCustomField10084: Decoder[JiraIssueFieldCustomField10084] = new Decoder[JiraIssueFieldCustomField10084] {
+    final def apply(c: HCursor): Result[JiraIssueFieldCustomField10084] = {
+      val stringOpt = c.focus.fold[Option[String]](
+        None,
+        _ => None,
+        number => Some(number.truncateToLong.toString),
+        str => Some(str),
+        _ => None,
+        _ => None
+      )
+      Xor.right(JiraIssueFieldCustomField10084(stringOpt))
+    }
+  }
 
   implicit val worklogEncoder: Encoder[Worklog] = deriveEncoder
 
