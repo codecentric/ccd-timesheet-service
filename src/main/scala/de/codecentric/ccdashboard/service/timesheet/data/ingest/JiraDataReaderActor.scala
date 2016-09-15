@@ -70,10 +70,10 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       log.info("Received Start message -> commencing to query Jira")
       // Start Tempo Worklog Query async
       val now = LocalDate.now()
-      //context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = false))
+      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = false))
 
       // Start Jira User Queries async
-      //context.system.scheduler.scheduleOnce(0.seconds, self, JiraUserQueryTask(0, 0))
+      context.system.scheduler.scheduleOnce(0.seconds, self, JiraUserQueryTask(0, 0))
 
       // Query tempo teams
       context.system.scheduler.scheduleOnce(0.seconds, self, JiraTempoTeamQueryTask)
