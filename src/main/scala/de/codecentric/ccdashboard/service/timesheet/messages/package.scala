@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet
 import java.time.LocalDate
 import java.util.Date
 
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, User, Worklog}
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Teams, User, Worklog}
 
 /**
   * Collection of all message and query classes used in communication between the actors
@@ -49,6 +49,16 @@ package object messages {
     * Query for issue response
     */
   case class IssueQueryResult(issue: Option[Issue])
+
+  /**
+    * Query for all teams or one specific team
+    */
+  case class TeamQuery(teamId: Option[Int] = None)
+
+  /**
+    * Query for all teams or one specific response
+    */
+  case class TeamQueryResponse(teams: Option[Teams])
 
 
 

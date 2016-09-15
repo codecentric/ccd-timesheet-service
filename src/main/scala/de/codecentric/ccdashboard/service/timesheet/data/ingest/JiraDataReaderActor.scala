@@ -49,7 +49,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
   val timesheetProjectKey = conf.getString("timesheet-service.data-import.project-key")
   val importStartDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
   val importBatchSizeDays = conf.getDuration("timesheet-service.data-import.batch-size").toDays
-  val importSyncRange = conf.getDuration("timesheet-service.data-import.sync-range")
+  val importSyncRangeDays = conf.getDuration("timesheet-service.data-import.sync-range").toDays
   val importWaitBetweenBatches = {
     val v = conf.getDuration("timesheet-service.data-import.wait-between-batches")
     FiniteDuration(v.toNanos, TimeUnit.NANOSECONDS)
@@ -60,32 +60,32 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   import context.dispatcher
 
-  log.info(s"Instantiated with: $scheme, $host, $jiraTempoPath, $accessToken, $tempoApiToken, $consumerPrivateKey, $importStartDate, $importEndDate")
+  log.debug(s"Instantiated with: $scheme, $host, $jiraTempoPath, $accessToken, $tempoApiToken, $consumerPrivateKey, $importStartDate, $importEndDate")
 
   def receive = {
     /**
       * Perform startup and send initial request
       */
     case Start =>
-      log.info("Received Start message")
+      log.info("Received Start message -> commencing to query Jira")
       // Start Tempo Worklog Query async
       val now = LocalDate.now()
-      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = false))
+      //context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = false))
 
       // Start Jira User Queries async
-    //context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask(0, 0))
+      //context.system.scheduler.scheduleOnce(0.seconds, self, JiraUserQueryTask(0, 0))
 
-    // Query one issue
-    //context.system.scheduler.scheduleOnce(2.seconds, self, JiraIssueDetailsQueryTask(Left("CCD-36")))
+      // Query tempo teams
+      context.system.scheduler.scheduleOnce(0.seconds, self, JiraTempoTeamQueryTask)
 
-    // Query tempo teams
-    //context.system.scheduler.scheduleOnce(1.seconds, self, JiraTempoTeamQueryTask)
-
+    /**
+      * Handle the different query messages
+      */
     case TempoWorklogQueryTask(toDate, fromDate, syncing) =>
-      log.info("Tempo query task received.")
+      log.debug("Tempo query task received.")
 
       val queryUri = getWorklogRequestUri(fromDate, toDate)
-      log.info(s"Using query: $queryUri")
+      log.debug(s"Using query: $queryUri")
 
       handleRequest(queryUri, signRequest = false,
         // Success handler
@@ -96,7 +96,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
               .map(_.map(_.toWorklog))
               .map(Worklogs)
 
-          // TODO: Filter internal issue IDs
+          // TODO: Filter internal issue IDs?
           worklogsFuture.foreach(worklogs => {
             worklogs.content.map(_.issueKey).distinct.filter(_ => true).foreach(issueId =>
               self ! JiraIssueDetailsQueryTask(Left[String, Int](issueId))
@@ -105,10 +105,10 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
           worklogsFuture.pipeTo(dataWriter)
 
-          // Determine which task to query next
+          // Determine which task to query when
           val now = LocalDate.now()
           val nextImport = if (syncing) {
-            if (fromDate.isEqual(now.minus(importSyncRange))) {
+            if (fromDate.isEqual(now.minusDays(importSyncRangeDays))) {
               TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(importBatchSizeDays), syncing = true)
@@ -125,11 +125,11 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         },
         // Error handler
         ex => {
-          log.warning(s"Query task failed because of error '${ex.getMessage}'")
+          log.error(s"TempoWorklogQueryTask task failed because of query error '${ex.getMessage}'")
         })
 
     case JiraUserQueryTask(iteration, charIndex) =>
-      log.info("Jira user query task received.")
+      log.debug("Jira user query task received.")
 
       val currentChar = alphabet(charIndex)
       val uri = getJiraUsersRequestUri(currentChar)
@@ -137,38 +137,38 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       handleRequest(uri, signRequest = true,
         // Success handler
         jsonEntityHandler(_)(jsonString => {
-          log.info(s"Received jsonString $jsonString")
+          //log.info(s"Received jsonString $jsonString")
           decode[List[JiraUser]](jsonString) match {
             case Xor.Left(error) =>
               log.error(error, "Could not decode users.")
             case Xor.Right(jiraUsers) =>
-              log.info(s"Received ${jiraUsers.size} user")
+              log.debug(s"Received ${jiraUsers.size} user")
               val users = jiraUsers.map(_.toUser)
               dataWriter ! Users(users)
 
               if (charIndex == alphabet.size - 1) {
-                log.info("Scheduling new iteration in 3600 seconds")
+                log.info("Scheduling new users-query iteration in 3600 seconds")
                 context.system.scheduler.scheduleOnce(3600.seconds, self, JiraUserQueryTask(iteration + 1, 0))
               } else {
-                log.info("Scheduling next user query in 10 seconds")
+                log.debug("Scheduling next user query in 10 seconds")
                 context.system.scheduler.scheduleOnce(10.seconds, self, JiraUserQueryTask(iteration, charIndex + 1))
               }
           }
         }),
         // Error handler
         ex => {
-          log.warning(s"Query task failed because of error '${ex.getMessage}'")
+          log.error(s"JiraUserQueryTask task failed because of query error '${ex.getMessage}'")
         })
 
     case JiraIssueDetailsQueryTask(issueId: Either[String, Int]) =>
-      log.info(s"Querying issue details task for issue id $issueId received.")
+      log.debug(s"Querying issue details task for issue id $issueId received.")
       val queryUri = getJiraIssueDetailsUri(issueId)
       handleRequest(queryUri, signRequest = true,
         // Success handler
         jsonEntityHandler(_)(jsonString => {
           decode[JiraIssue](jsonString) match {
             case Xor.Left(error) =>
-              println(issueId + " : " + error)
+              log.error(error, s"Could not decode issue $issueId")
             case Xor.Right(jiraIssue) =>
               val issue = jiraIssue.toIssue
               dataWriter ! issue
@@ -176,11 +176,11 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         }),
         // Error handler
         ex => {
-          log.warning(s"Query task failed because of error '${ex.getMessage}'")
+          log.error(s"JiraIssueDetailsQueryTask task failed because of query error '${ex.getMessage}'")
         })
 
     case JiraTempoTeamQueryTask =>
-      log.info("Jira Tempo Team task received.")
+      log.debug("Jira Tempo Team task received.")
       val queryUri = getJiraTempoTeamsUri
       handleRequest(queryUri, signRequest = true,
         // Success handler
@@ -195,13 +195,13 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         }),
         // Error handler
         ex => {
-          log.warning(s"Query task failed because of error '${ex.getMessage}'")
+          log.error(s"JiraTempoTeamQueryTask task failed because of query error '${ex.getMessage}'")
         })
 
     case JiraTempoTeamMembersQueryTask((teamId :: remainingTeamIds)) =>
-      log.info("Jira Tempo Team Members task received.")
+      log.debug("Jira Tempo Team Members task received.")
       val queryUri = getJiraTempoTeamMembersUri(teamId)
-      log.info(s"Using query URI: $queryUri")
+      log.debug(s"Using query URI: $queryUri")
       handleRequest(queryUri, signRequest = true,
         // Success handler
         jsonEntityHandler(_)(jsonString => {
@@ -217,13 +217,13 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
             log.info("Scheduling next Teams query iteration in 3600 seconds")
             context.system.scheduler.scheduleOnce(3600.seconds, self, JiraTempoTeamQueryTask)
           } else {
-            log.info(s"Scheduling team query for next team in 10 seconds")
-            context.system.scheduler.scheduleOnce(10.seconds, self, JiraTempoTeamMembersQueryTask(remainingTeamIds))
+            log.debug(s"Scheduling team query for next team in 1 second")
+            context.system.scheduler.scheduleOnce(1.seconds, self, JiraTempoTeamMembersQueryTask(remainingTeamIds))
           }
         }),
         // Error handler
         ex => {
-          log.warning(s"Query task failed because of error '${ex.getMessage}'")
+          log.error(s"JiraTempoTeamMembersQueryTask task failed because of query error '${ex.getMessage}'")
         })
   }
 

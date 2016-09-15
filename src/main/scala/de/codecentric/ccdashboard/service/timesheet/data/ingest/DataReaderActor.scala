@@ -40,7 +40,7 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
   })
 
   def handleRequest(uri: Uri, signRequest: Boolean = false, successEntityHandler: HttpEntity => Unit, failureHandler: Throwable => Unit) = Try {
-    log.info(s"Using URI: $uri")
+    log.debug(s"Using URI: $uri")
     val httpRequest = HttpRequest(method = HttpMethods.GET, uri = uri)
 
     val optSignedRequest = (signRequest, oAuthSigHelper) match {

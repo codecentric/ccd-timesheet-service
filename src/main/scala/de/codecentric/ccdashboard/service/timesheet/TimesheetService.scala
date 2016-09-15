@@ -12,6 +12,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
+import com.github.bjoernjacobs.csup.CsUp
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
@@ -40,12 +41,8 @@ object TimesheetService extends App {
   val logger = Logging.getLogger(system, this)
 
   // try to acquire connection to database and perform initialization
-  implicit val timeout = Timeout(60.minutes)
+  Await.result(CsUp().init(), Duration.Inf)
 
-  val databaseInitializer = system.actorOf(Props(new DatabaseInitializerActor(conf)), "database-initializer")
-  val responseFuture = (databaseInitializer ? InitDatabaseConnection).mapTo[InitDatabaseConnectionResponse]
-
-  val response = Await.ready(responseFuture, Duration.Inf)
   val httpServerBinding = startUp
 
   sys.addShutdownHook({
@@ -99,12 +96,14 @@ object TimesheetService extends App {
     }
 
     pathPrefix("user" / usernameMatcher) { username =>
-      logger.info(s"Username ist: $username")
-      pathEndOrSingleSlash {
-        val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
-        onComplete(query) {
-          case Success(res) => complete(res.user)
-          case Failure(ex) => failWith(ex)
+      get {
+        logger.info(s"Username ist: $username")
+        pathEndOrSingleSlash {
+          val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
+          onComplete(query) {
+            case Success(res) => complete(res.user)
+            case Failure(ex) => failWith(ex)
+          }
         }
       } ~
         path("worklog") {
@@ -120,11 +119,32 @@ object TimesheetService extends App {
         }
     } ~
       pathPrefix("issue" / issueIdMatcher) { id =>
-        pathEndOrSingleSlash {
-          val query = (dataProvider ? IssueQuery(id)).mapTo[IssueQueryResult]
-          onComplete(query) {
-            case Success(res) => complete(res.issue)
-            case Failure(ex) => failWith(ex)
+        get {
+          pathEndOrSingleSlash {
+            val query = (dataProvider ? IssueQuery(id)).mapTo[IssueQueryResult]
+            onComplete(query) {
+              case Success(res) => complete(res.issue)
+              case Failure(ex) => failWith(ex)
+            }
+          }
+        }
+      } ~
+      pathPrefix("team" / IntNumber.?) { id =>
+        get {
+          pathEndOrSingleSlash {
+            val query = (dataProvider ? TeamQuery(id)).mapTo[TeamQueryResponse]
+            onComplete(query) {
+              case Success(res) => {
+                res.teams match {
+                  case Some(teams) =>
+                    val content = teams.content
+                    if (content.size == 1) complete(content.head)
+                    else complete(content)
+                  case None => complete()
+                }
+              }
+              case Failure(ex) => failWith(ex)
+            }
           }
         }
       }

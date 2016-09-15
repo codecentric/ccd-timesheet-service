@@ -50,7 +50,7 @@ package object encoding {
 
   /* Encoders and decoders for Circe */
   implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
-    Json.fromString(DateTimeFormatter.ISO_DATE.format(date.toInstant))
+    Json.fromString(localDateDecoder.f(date).format(DateTimeFormatter.ISO_DATE))
   )
 
   implicit val decodeDate: Decoder[Option[Date]] = Decoder.instance(c =>

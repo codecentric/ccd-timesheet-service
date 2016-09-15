@@ -1,5 +1,7 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
+import java.util.Date
+
 import akka.actor.{Actor, ActorLogging}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.model._
@@ -40,16 +42,16 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
 
   def receive = {
     case Worklogs(worklogs) =>
-      log.info(s"Received ${worklogs.size} worklogs to store")
+      log.debug(s"Received ${worklogs.size} worklogs to store")
       ctx.run(insertWorklogs(worklogs))
 
     case Users(users) =>
-      log.info(s"Received ${users.size} users to store")
+      log.debug(s"Received ${users.size} users to store")
       ctx.run(insertUsers(users))
 
     case i: Issue =>
       import scala.collection.JavaConverters._
-      log.info(s"Received one issue to store")
+      log.debug(s"Received one issue to store")
 
       ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, components, custom_fields, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?)", (s) => {
         //val componentsString = stringMapEncoder.f(i.components)
@@ -62,25 +64,26 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
       })
 
     case Teams(teams) =>
-      log.info(s"Received ${teams.size} teams to store")
+      log.debug(s"Received ${teams.size} teams to store")
       teams.foreach(team =>
         ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
           st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
         ))
 
     case TeamMemberships(teamId, members) =>
-      log.info(s"Received ${members.size} members for team $teamId to store")
-    // TODO: insert members here as map into table team
-    /*     val membersMap = members.map {
-           case TeamMember(name, date) => name -> date
-         }.toMap.
+      import scala.collection.JavaConverters._
 
-           ctx.executeAction("INSERT INTO team (members) VALUES (?) WHERE id = ?", (st) =>
-           st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
-         ))
-   */
+      log.debug(s"Received ${members.size} members for team $teamId to store")
+      // insert members here as map into table team
+      // Cassandra doesn't allow null values in collections so if there is no
+      // Date available, use the 'initial' Date (Jan. 1 1970)
+      val membersMap = members.map {
+        case TeamMember(name, date) => name -> date.getOrElse(new Date(0))
+      }.toMap.asJava
 
-
+      ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
+        st.bind(membersMap, teamId.asInstanceOf[java.lang.Integer])
+      )
 
     case x => log.warning(s"Received unknown message: $x")
   }

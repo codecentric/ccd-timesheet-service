@@ -19,7 +19,6 @@ libraryDependencies ++= {
   val circeV = "0.5.1"
   val quillV = "0.10.0"
 
-
   Seq(
     //  groupID %% artifactID % revision
     // Actors, rest server and client
@@ -44,7 +43,9 @@ libraryDependencies ++= {
     "io.circe" %% "circe-parser" % circeV,
     "io.circe" %% "circe-java8" % circeV,
     "io.circe" %% "circe-jawn" % circeV,
-    "de.heikoseeberger" %% "akka-http-circe" % "1.9.0"
+    "de.heikoseeberger" %% "akka-http-circe" % "1.9.0",
+    // Cassandra initialization
+    "com.github.bjoernjacobs" %% "csup" % "0.0.5-SNAPSHOT"
   )
 }
 
