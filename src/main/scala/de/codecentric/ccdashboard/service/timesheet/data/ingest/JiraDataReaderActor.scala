@@ -93,7 +93,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       log.debug("Tempo query task received.")
 
       val queryUri = getWorklogRequestUri(fromDate, toDate)
-      log.debug(s"Using query: $queryUri")
+      log.info(s"Using query: $queryUri")
 
       handleRequest(queryUri, signRequest = false,
         // Success handler
@@ -116,13 +116,13 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           // Determine which task to query when
           val now = LocalDate.now()
           val nextImport = if (syncing) {
-            if (fromDate.isEqual(now.minusDays(importSyncRangeDays))) {
+            if (fromDate.isBefore(now.minusDays(importSyncRangeDays))) {
               TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(importBatchSizeDays), syncing = true)
             }
           } else {
-            if (fromDate.isEqual(importStartDate)) {
+            if (fromDate.isBefore(importStartDate)) {
               completedWorklogsImportOnce = true
               TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = true)
             } else {
