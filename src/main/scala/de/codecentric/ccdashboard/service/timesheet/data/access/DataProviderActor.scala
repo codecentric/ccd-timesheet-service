@@ -88,7 +88,7 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
     case UserQuery(username) =>
       val requester = sender
       log.debug("Received UserQuery")
-      ctx.run(userQuery.filter(_.userkey == lift(username)).take(1))
+      ctx.run(userQuery.filter(_.name == lift(username)).take(1))
         .map(users => UserQueryResult(users.headOption))
         .pipeTo(requester)
 

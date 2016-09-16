@@ -150,8 +150,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
                 log.info("Scheduling new users-query iteration in 3600 seconds")
                 context.system.scheduler.scheduleOnce(3600.seconds, self, JiraUserQueryTask(iteration + 1, 0))
               } else {
-                log.debug("Scheduling next user query in 10 seconds")
-                context.system.scheduler.scheduleOnce(10.seconds, self, JiraUserQueryTask(iteration, charIndex + 1))
+                log.debug("Scheduling next user query in 2 seconds")
+                context.system.scheduler.scheduleOnce(2.seconds, self, JiraUserQueryTask(iteration, charIndex + 1))
               }
           }
         }),
