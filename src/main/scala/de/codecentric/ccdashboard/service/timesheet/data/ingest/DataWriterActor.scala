@@ -1,10 +1,12 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
+import java.time.LocalDateTime
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.{Actor, ActorLogging, ActorPath}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.model._
+import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
 import io.getquill.{CassandraSyncContext, SnakeCase}
 
 /**
@@ -19,6 +21,8 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
   lazy val ctx = new CassandraSyncContext[SnakeCase](dbConfigKey)
 
   import ctx._
+
+  var lastWrite: Option[LocalDateTime] = None
 
   def insertWorklogs(w: List[Worklog]) = quote {
     liftQuery(w).foreach(worklog => {
@@ -43,11 +47,18 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
   def receive = {
     case Worklogs(worklogs) =>
       log.debug(s"Received ${worklogs.size} worklogs to store")
+
       ctx.run(insertWorklogs(worklogs))
+
+      lastWrite = Some(LocalDateTime.now())
 
     case Users(users) =>
       log.debug(s"Received ${users.size} users to store")
+
+      ctx.run(query[User].delete)
       ctx.run(insertUsers(users))
+
+      lastWrite = Some(LocalDateTime.now())
 
     case i: Issue =>
       import scala.collection.JavaConverters._
@@ -63,12 +74,19 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
         s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, customFieldsMap, i.issueType.asJava)
       })
 
+      lastWrite = Some(LocalDateTime.now())
+
     case Teams(teams) =>
       log.debug(s"Received ${teams.size} teams to store")
+
+      ctx.run(query[Team].delete)
+
       teams.foreach(team =>
         ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
           st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
         ))
+
+      lastWrite = Some(LocalDateTime.now())
 
     case TeamMemberships(teamId, members) =>
       import scala.collection.JavaConverters._
@@ -84,6 +102,13 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
       ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
         st.bind(membersMap, teamId.asInstanceOf[java.lang.Integer])
       )
+      lastWrite = Some(LocalDateTime.now())
+
+    case StatusRequest(statusActor) =>
+      statusActor ! StatusNotification("DataWriter", Map(
+        "status" -> "running",
+        "last write" -> lastWrite.map(_.toString).getOrElse("")
+      ))
 
     case x => log.warning(s"Received unknown message: $x")
   }

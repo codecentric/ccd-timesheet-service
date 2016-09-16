@@ -19,6 +19,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
+import de.codecentric.ccdashboard.service.timesheet.util._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
 
 import scala.concurrent.duration._
@@ -39,6 +40,9 @@ object TimesheetService extends App {
   implicit val executionContext = system.dispatcher
 
   val logger = Logging.getLogger(system, this)
+
+  val statusActor = system.actorOf(Props[StatusActor], "status-actor")
+  statusActor ! StatusNotification("TimesheetService", Map("status" -> "booting"))
 
   // try to acquire connection to database and perform initialization
   Await.result(CsUp().init(), Duration.Inf)
@@ -63,6 +67,21 @@ object TimesheetService extends App {
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf)), "data-importer")
     val dataProvider = system.actorOf(Props(new DataProviderActor(conf)), "data-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider), interface, port)
+
+    system.scheduler.schedule(5.seconds, 30.seconds, new Runnable {
+      override def run(): Unit = {
+        dataImporter ! StatusRequest(statusActor)
+        dataProvider ! StatusRequest(statusActor)
+        statusActor ! StatusNotification("TimesheetService",
+          Map(
+            "status" -> "running",
+            "start time" -> new Date(system.startTime).toString,
+            "uptime (s)" -> system.uptime.toString,
+            "debug log enabled" -> system.log.isDebugEnabled.toString,
+            "dead letters" -> system.mailboxes.deadLetterMailbox.numberOfMessages.toString
+          ))
+      }
+    })
 
     // Start importing
     dataImporter ! Start
@@ -143,6 +162,17 @@ object TimesheetService extends App {
                   case None => complete()
                 }
               }
+              case Failure(ex) => failWith(ex)
+            }
+          }
+        }
+      } ~
+      pathPrefix("status") {
+        get {
+          pathEndOrSingleSlash {
+            val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]
+            onComplete(query) {
+              case Success(res) => complete(res.statusMap)
               case Failure(ex) => failWith(ex)
             }
           }

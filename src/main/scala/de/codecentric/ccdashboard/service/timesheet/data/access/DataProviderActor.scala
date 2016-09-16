@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.access
 import java.time.{LocalDateTime, ZoneId}
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging}
+import akka.actor.{Actor, ActorLogging, ActorPath}
 import akka.pattern.pipe
 import com.datastax.driver.core.{Row, TypeTokens}
 import com.google.common.reflect.TypeToken
@@ -27,6 +27,11 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
   private val stringToken = TypeToken.of(classOf[String])
   private val stringMapToken = TypeTokens.mapOf(stringToken, stringToken)
   private val dateToken = TypeToken.of(classOf[java.util.Date])
+
+  private var userQueryCount = 0L
+  private var teamQueryCount = 0L
+  private var worklogQueryCount = 0L
+  private var issueQueryCount = 0L
 
   private val teamExtractor: Row => Team = { row => {
     val id = row.getInt(0)
@@ -84,6 +89,7 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
       ctx.run(worklogQuery(username, from, to))
         .map(WorklogQueryResult)
         .pipeTo(requester)
+      worklogQueryCount = worklogQueryCount + 1
 
     case UserQuery(username) =>
       val requester = sender
@@ -91,6 +97,7 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
       ctx.run(userQuery.filter(_.name == lift(username)).take(1))
         .map(users => UserQueryResult(users.headOption))
         .pipeTo(requester)
+      userQueryCount = userQueryCount + 1
 
     case IssueQuery(id) =>
       val requester = sender
@@ -115,6 +122,7 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
         case Success(issue) => requester ! IssueQueryResult(Some(issue))
         case Failure(ex) => requester ! IssueQueryResult(None)
       }
+      issueQueryCount = issueQueryCount + 1
 
     case TeamQuery(teamId) =>
       val requester = sender
@@ -132,5 +140,6 @@ class DataProviderActor(conf: Config) extends Actor with ActorLogging {
           ).map(t => TeamQueryResponse(Some(Teams(t))))
             .pipeTo(requester)
       }
+      teamQueryCount = teamQueryCount + 1
   }
 }

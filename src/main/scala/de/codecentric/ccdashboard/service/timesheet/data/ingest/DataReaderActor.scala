@@ -1,6 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
-import akka.actor.{Actor, ActorLogging, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorPath, ActorRef}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.stream.scaladsl.{Flow, Sink, Source}

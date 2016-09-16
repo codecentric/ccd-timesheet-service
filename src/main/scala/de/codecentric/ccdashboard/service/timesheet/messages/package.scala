@@ -66,7 +66,7 @@ package object messages {
 
   case class TempoWorklogQueryTask(toDate: LocalDate, fromDate: LocalDate, syncing: Boolean)
 
-  case class JiraUserQueryTask(iteration: Int, charIndex: Int)
+  case class JiraUserQueryTask()
 
   case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
 

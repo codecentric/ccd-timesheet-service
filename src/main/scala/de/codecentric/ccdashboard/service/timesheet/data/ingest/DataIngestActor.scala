@@ -1,8 +1,10 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorPath, ActorRef, Props}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.messages.{Start, Stop}
+import de.codecentric.ccdashboard.service.timesheet.util.StatusRequest
+
 import scala.concurrent.duration._
 
 /**
@@ -30,6 +32,10 @@ class DataIngestActor(conf: Config) extends Actor with ActorLogging {
   }
 
   def running(dataWriterActor: ActorRef, dataReaderActor: ActorRef): Receive = {
+    case s: StatusRequest =>
+      dataReaderActor ! s
+      dataWriterActor ! s
+
     case Stop =>
       context.stop(dataReaderActor)
       context.stop(dataWriterActor)
