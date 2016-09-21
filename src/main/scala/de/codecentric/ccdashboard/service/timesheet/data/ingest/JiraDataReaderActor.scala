@@ -1,25 +1,29 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
+import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
+import java.util.Date
 import java.util.concurrent.TimeUnit
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.pipe
+import akka.pattern.ask
+import akka.util.Timeout
 import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
-import de.codecentric.ccdashboard.service.timesheet.messages.{JiraIssueDetailsQueryTask, JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
+import de.codecentric.ccdashboard.service.timesheet.messages.{EnrichWorklogQueryData, JiraIssueDetailsQueryTask, JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
 import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.java8.time._
 
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -39,11 +43,14 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   override def authority = Uri.Authority(Uri.Host(host))
 
+  val aggregationActor = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
+
   val jiraUsersServicePath = jiraConf.getString("get-users-service-path")
   val jiraIssueDetailsServicePath = jiraConf.getString("get-issue-details-service-path")
-  val jiraTempoTeamServicePath = jiraConf.getString("get-tempo-team-service-path")
-  val jiraTempoTeamMembersServicePath = jiraConf.getString("get-tempo-team-members-service-path")
-  val jiraTempoPath = jiraConf.getString("tempo.service-path")
+  val jiraTempoTeamServicePath = jiraConf.getString("tempo.team-service-path")
+  val jiraTempoTeamMembersServicePath = jiraConf.getString("tempo.team-members-service-path")
+  val jiraTempoWorklogsServicePath = jiraConf.getString("tempo.worklog-service-path")
+  val jiraTempoUserScheduleServicePath = jiraConf.getString("tempo.user-schedule-service-path")
 
   val accessToken = jiraConf.getString("access-token")
   val tempoApiToken = jiraConf.getString("tempo.api-token")
@@ -68,7 +75,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   import context.dispatcher
 
-  log.debug(s"Instantiated with: $scheme, $host, $jiraTempoPath, $accessToken, $tempoApiToken, $consumerPrivateKey, $importStartDate, $importEndDate")
+  log.debug(s"Instantiated with: $scheme, $host, $jiraTempoWorklogsServicePath, $accessToken, $tempoApiToken, $consumerPrivateKey, $importStartDate, $importEndDate")
 
   def receive = {
     /**
@@ -90,10 +97,12 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       * Handle the different query messages
       */
     case q@TempoWorklogQueryTask(toDate, fromDate, syncing) =>
+      implicit val timeout = Timeout(60.seconds)
+
       log.debug("Tempo query task received.")
 
       val queryUri = getWorklogRequestUri(fromDate, toDate)
-      log.info(s"Using query: $queryUri")
+      log.debug(s"Using query: $queryUri")
 
       handleRequest(queryUri, signRequest = false,
         // Success handler
@@ -104,12 +113,27 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
               .map(_.map(_.toWorklog))
               .map(Worklogs)
 
-          // TODO: Filter internal issue IDs?
-          worklogsFuture.foreach(worklogs => {
-            worklogs.content.map(_.issueKey).distinct.filter(_ => true).foreach(issueId =>
-              self ! JiraIssueDetailsQueryTask(Left[String, Int](issueId))
-            )
-          })
+          val issueResponses = worklogsFuture
+            .map(_.content.map(_.issueKey).distinct)
+            .map(_.map(issueKey => (self ? JiraIssueDetailsQueryTask(Left[String, Int](issueKey))).mapTo[JiraIssueDetailsQueryTaskResponse]))
+            .flatMap(list => Future.sequence(list))
+            .map(_.map(_.issue))
+
+          val userWorklogGroupFuture = worklogsFuture.map(_.content.groupBy(_.username))
+
+          val enrichmentRequests = for {
+            issues <- issueResponses
+            userWorklogGroups <- userWorklogGroupFuture
+          } yield {
+            userWorklogGroups.map {
+              case (username, worklogs) =>
+                val worklogIssues = worklogs.map(_.issueKey).distinct
+                val relevantIssues = issues.filter(i => worklogIssues.contains(i.issueKey))
+                (username, worklogs, relevantIssues)
+            }
+          }
+
+          enrichmentRequests.map(_.foreach(r => aggregationActor ! PerformUtilizationAggregation(r._1, r._2, r._3)))
 
           worklogsFuture.pipeTo(dataWriter)
 
@@ -177,6 +201,11 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         instanaUsers <- instanaUsersPromise.future
       } yield Users(ccUsers ++ instanaUsers)
 
+      val userScheduleQuery = allUsers
+        .map(_.content.map(_.name))
+        .map(_.map(username => TempoUserScheduleQueryTask(username, importStartDate, LocalDate.now())))
+        .map(_.foreach(task => self ! task))
+
       allUsers.onComplete {
         case Success(users) =>
           dataWriter ! users
@@ -192,7 +221,30 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, q)
       }
 
+    case TempoUserScheduleQueryTask(username, startDate, endDate) =>
+      log.debug("Jira user schedules task received.")
+
+      val queryUri = getJiraTempoUserScheduleUri(username, localDateEncoder.f(startDate), localDateEncoder.f(endDate))
+      handleRequest(queryUri, signRequest = true,
+        // Success handler
+        jsonEntityHandler(_)(jsonString => {
+          decode[JiraUserSchedules](jsonString) match {
+            case Xor.Left(error) =>
+              log.error(error, s"Could not decode Jira user schedule")
+            case Xor.Right(jiraUserSchedule) =>
+              val userSchedules = jiraUserSchedule.toUserSchedules(username)
+              dataWriter ! userSchedules
+
+              lastRead = Some(LocalDateTime.now())
+          }
+        }),
+        // Error handler
+        ex => {
+          log.error(ex, s"TempoUserScheduleQueryTask task failed")
+        })
+
     case JiraIssueDetailsQueryTask(issueId: Either[String, Int]) =>
+      val requester = sender()
       log.debug(s"Querying issue details task for issue id $issueId received.")
       val queryUri = getJiraIssueDetailsUri(issueId)
       handleRequest(queryUri, signRequest = true,
@@ -205,6 +257,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
               val issue = jiraIssue.toIssue
               dataWriter ! issue
               lastRead = Some(LocalDateTime.now())
+
+              requester ! JiraIssueDetailsQueryTaskResponse(issue)
           }
         }),
         // Error handler
@@ -219,7 +273,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         // Success handler
         jsonEntityHandler(_)(jsonString => {
           decode[Seq[JiraTempoTeam]](jsonString) match {
-            case Xor.Left(error) => println(error)
+            case Xor.Left(error) =>
+              log.error(error, "Could not decode Jira Tempo Team")
             case Xor.Right(jiraTempoTeams) =>
               dataWriter ! Teams(jiraTempoTeams.map(_.toTeam).toList)
               val teamIds = jiraTempoTeams.map(_.id).toList
@@ -285,7 +340,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       "tempoApiToken" -> tempoApiToken,
       "projectKey" -> timesheetProjectKey)).toString
 
-    val path = Uri.Path(jiraTempoPath)
+    val path = Uri.Path(jiraTempoWorklogsServicePath)
 
     Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
   }
@@ -317,5 +372,17 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     val path = Uri.Path(jiraTempoTeamMembersServicePath.format(teamId.toString))
     Uri(scheme = scheme, authority = authority, path = path)
   }
+
+  def getJiraTempoUserScheduleUri(username: String, from: Date, to: Date) = {
+    val path = Uri.Path(jiraTempoUserScheduleServicePath)
+    val queryString = Query(Map(
+      "user" -> username,
+      "from" -> dateIsoFormatter(from),
+      "to" -> dateIsoFormatter(to)
+    )).toString()
+
+    Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
+  }
+
 }
 

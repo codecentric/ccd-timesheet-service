@@ -24,7 +24,7 @@ import de.heikoseeberger.akkahttpcirce.CirceSupport
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * Created by bjacobs on 12.07.16.
@@ -116,7 +116,6 @@ object TimesheetService extends App {
 
     pathPrefix("user" / usernameMatcher) { username =>
       get {
-        logger.info(s"Username ist: $username")
         pathEndOrSingleSlash {
           val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
           onComplete(query) {
@@ -131,6 +130,27 @@ object TimesheetService extends App {
               val query = (dataProvider ? WorklogQuery(username, from, to)).mapTo[WorklogQueryResult]
               onComplete(query) {
                 case Success(res) => complete(res.worklogs)
+                case Failure(ex) => failWith(ex)
+              }
+            }
+          }
+        } ~
+        path("report") {
+          get {
+            parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
+              val aggregationTypeTry = aggregationTypeString
+                .map(s => Try(UserReportQueryAggregationType.withName(s)))
+                .getOrElse(Success(UserReportQueryAggregationType.DAILY))
+
+              if (aggregationTypeTry.isFailure) {
+                failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${UserReportQueryAggregationType.values}"))
+              }
+
+              val aggregationType = aggregationTypeTry.get
+
+              val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[UserReportQueryResponse]
+              onComplete(query) {
+                case Success(res) => complete(res)
                 case Failure(ex) => failWith(ex)
               }
             }

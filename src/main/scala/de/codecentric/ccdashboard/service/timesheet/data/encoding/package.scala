@@ -8,10 +8,14 @@ import akka.http.scaladsl.model.HttpEntity
 import akka.http.scaladsl.unmarshalling.{Unmarshal, _}
 import akka.stream.Materializer
 import cats.data.Xor
-import de.codecentric.ccdashboard.service.timesheet.data.model.jira.{JiraIssueFieldCustomField10084, JiraWorklog}
+import de.codecentric.ccdashboard.service.timesheet.data.access.ReportAggregationResult
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira.{JiraIssueFieldCustomField10084, JiraUserScheduleDay, JiraUserSchedules, JiraWorklog}
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
+import de.codecentric.ccdashboard.service.timesheet.messages
+import de.codecentric.ccdashboard.service.timesheet.messages.UserReportQueryResponse
 import io.circe.Decoder.Result
 import io.circe.generic.semiauto._
+import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
 import io.circe.{Encoder, _}
@@ -24,6 +28,9 @@ import scala.xml.XML
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
 package object encoding {
+  /* Custom transformations */
+  def dateIsoFormatter(date: Date) = localDateDecoder.f(date).format(DateTimeFormatter.ISO_DATE)
+
   /* Encoders and decoders for Quill */
   implicit val localDateTimeEncoder = MappedEncoding[LocalDateTime, Date](ldt => Date.from(ldt.atZone(ZoneId.systemDefault()).toInstant))
   implicit val localDateTimeDecoder = MappedEncoding[Date, LocalDateTime](date => Instant.ofEpochMilli(date.getTime).atZone(ZoneId.systemDefault()).toLocalDateTime)
@@ -50,7 +57,7 @@ package object encoding {
 
   /* Encoders and decoders for Circe */
   implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
-    Json.fromString(localDateDecoder.f(date).format(DateTimeFormatter.ISO_DATE))
+    Json.fromString(dateIsoFormatter(date))
   )
 
   implicit val decodeDate: Decoder[Option[Date]] = Decoder.instance(c =>
@@ -81,6 +88,29 @@ package object encoding {
   implicit val worklogEncoder: Encoder[Worklog] = deriveEncoder
 
   implicit val issueEncoder: Encoder[Issue] = deriveEncoder
+
+  implicit val jiraUserScheduleDayDecoder: Decoder[JiraUserScheduleDay] = Decoder.decodeJsonObject.emap(obj =>
+    Xor.catchNonFatal {
+      val dateOpt = obj("date")
+        .flatMap(_.asString)
+        .map(str => LocalDate.parse(str))
+        .map(localDateEncoder.f)
+      val requiredSecondsOpt = obj("requiredSeconds").flatMap(_.asNumber).map(_.truncateToInt)
+      JiraUserScheduleDay(dateOpt.get, requiredSecondsOpt.get)
+    }.leftMap(t => "JiraUserScheduleDad")
+  )
+
+  implicit val jiraUserSchedulesDecoder: Decoder[JiraUserSchedules] = deriveDecoder[JiraUserSchedules]
+
+  implicit val reportAggregationResultEncoder = deriveEncoder[ReportAggregationResult]
+
+  implicit val userReportQueryResponseEncoder = deriveEncoder[UserReportQueryResponse]
+
+  /*  implicit val userSchedulesDecoder: Decoder[JiraUserSchedules] = new Decoder[JiraUserSchedules] {
+      override def apply(c: HCursor): Result[JiraUserSchedules] = {
+
+      }
+    }*/
 
   /* XML Marshallers */
   val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[List[JiraWorklog]]() {

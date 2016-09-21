@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 import java.time.LocalDateTime
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging, ActorPath}
+import akka.actor.{Actor, ActorLogging}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
@@ -26,8 +26,6 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
 
   def insertWorklogs(w: List[Worklog]) = quote {
     liftQuery(w).foreach(worklog => {
-      // Until this is fixed, table name is hardcoded. See https://github.com/getquill/quill/issues/501
-      // query[JiraWorklog].schema(_.entity(worklogTableName)).insert(worklog)
       query[Worklog].insert(worklog)
     })
   }
@@ -41,6 +39,16 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
   def insertIssues(i: List[Issue]) = quote {
     liftQuery(i).foreach(issue => {
       query[Issue].insert(issue)
+    })
+  }
+
+  def insertUtilization(u: UserUtilization) = quote {
+    query[UserUtilization].insert(lift(u))
+  }
+
+  def insertUserSchedules(u: List[UserSchedule]) = quote {
+    liftQuery(u).foreach(userSchedule => {
+      query[UserSchedule].insert(userSchedule)
     })
   }
 
@@ -64,14 +72,8 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
       import scala.collection.JavaConverters._
       log.debug(s"Received one issue to store")
 
-      ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, components, custom_fields, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?)", (s) => {
-        //val componentsString = stringMapEncoder.f(i.components)
-        //val customFieldsString = stringMapMapEncoder.f(i.customFields)
-        val customFieldsMap = i.customFields.map {
-          case (k, v) => k -> v.asJava
-        }.asJava
-
-        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.getOrElse(""), i.components.asJava, customFieldsMap, i.issueType.asJava)
+      ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, component, daily_rate, invoicing, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (s) => {
+        s.bind(i.id, i.issueKey, i.issueUrl, i.summary.orNull, i.component.asJava, i.dailyRate.orNull, i.invoicing.asJava, i.issueType.asJava)
       })
 
       lastWrite = Some(LocalDateTime.now())
@@ -103,6 +105,20 @@ class DataWriterActor(conf: Config) extends Actor with ActorLogging {
         st.bind(membersMap, teamId.asInstanceOf[java.lang.Integer])
       )
       lastWrite = Some(LocalDateTime.now())
+
+    case UserSchedules(username, userSchedules) =>
+      log.debug(s"Received ${userSchedules.size} user schedules for user $username")
+
+      ctx.run(insertUserSchedules(userSchedules))
+
+      lastWrite = Some(LocalDateTime.now())
+
+    case UtilizationAggregation(username, payload) =>
+      payload.foreach {
+        case (date, values) =>
+          val report = UserUtilization(username, date, values.head, values(1), values(2), values(3), values(4), values(5), values(6), values(7), values(8), values(9), values(10))
+          ctx.run(insertUtilization(report))
+      }
 
     case StatusRequest(statusActor) =>
       statusActor ! StatusNotification("DataWriter", Map(

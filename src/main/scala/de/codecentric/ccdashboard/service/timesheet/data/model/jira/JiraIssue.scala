@@ -15,23 +15,21 @@ import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Issueable
 
 case class JiraIssue(id: String, key: String, self: String, fields: JiraIssueFields) extends Issueable {
   override def toIssue: Issue = {
-    val components = fields.components.map(c => c.id -> c.name).toMap
+    val component = fields.components.take(1).map(c => c.id -> c.name).toMap
+    val dailyRate = fields.customfield_10084.flatMap(_.value)
+    val invoicing = fields.customfield_12300.map(i => i.id -> i.value).toMap
 
-    val f1 = fields.customfield_10084.map(s => "customfield_10084" -> Map("customfield_10084_value" -> s.value.getOrElse("")))
-    val f2 = fields.customfield_12300.map(f => "customfield_12300" -> Map(f.id -> f.value))
-    val customFieldsMap = Seq(f1, f2).flatten.toMap
-
-    Issue(id, key, self, fields.summary, components, customFieldsMap, JiraIssueFieldIssueType.unapply(fields.issuetype).toMap)
+    Issue(id, key, self, fields.summary, component, dailyRate, invoicing, JiraIssueFieldIssueType.unapply(fields.issuetype).toMap)
   }
 }
 
 case class JiraIssueFields(summary: Option[String],
-                           components: Seq[JiraIssueFieldComponents],
+                           components: Seq[JiraIssueFieldComponent],
                            customfield_12300: Option[JiraIssueFieldCustomField12300],
                            customfield_10084: Option[JiraIssueFieldCustomField10084],
                            issuetype: JiraIssueFieldIssueType)
 
-case class JiraIssueFieldComponents(id: String, name: String)
+case class JiraIssueFieldComponent(id: String, name: String)
 
 case class JiraIssueFieldCustomField10084(value: Option[String])
 
