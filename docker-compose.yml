@@ -10,6 +10,8 @@ services:
     image: ccd-timesheet-service
     ports:
       - "10005:8080"
+    expose:
+      - "8080"
     networks:
       - ccdashboardplatform_prodnetwork
     links:
