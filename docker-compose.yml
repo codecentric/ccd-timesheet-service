@@ -6,6 +6,7 @@ networks:
 
 services:
   timesheet-service:
+    container_name: timesheet-service
     image: ccd-timesheet-service
     ports:
       - "10005:8080"
