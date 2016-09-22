@@ -14,7 +14,7 @@ services:
     links:
       - cassandra:cassandra
   cassandra:
-    image: cassandra:3
+    build: ./DockerCassandra
     expose:
       - "9042"
     networks:

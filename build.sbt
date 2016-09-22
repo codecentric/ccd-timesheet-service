@@ -4,7 +4,7 @@ lazy val root = (project in file(".")).
   settings(
     name := "ccd-timesheet-service",
     organization := "de.codecentric",
-    version := "0.0.1-SNAPSHOT",
+    version := "0.5-SNAPSHOT",
     scalaVersion := "2.11.8"
   )
 

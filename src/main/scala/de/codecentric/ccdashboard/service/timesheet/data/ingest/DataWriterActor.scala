@@ -7,18 +7,16 @@ import akka.actor.{Actor, ActorLogging}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
-import io.getquill.{CassandraSyncContext, SnakeCase}
+import io.getquill.{CassandraContextConfig, CassandraSyncContext, SnakeCase}
 
 /**
   * Actor that receives Worklogs from a DataIngestActor and stores inserts them into the database
   */
-class DataWriterActor(conf: Config) extends Actor with ActorLogging {
+class DataWriterActor(conf: Config, cassandraContextConfig: CassandraContextConfig) extends Actor with ActorLogging {
 
   import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 
-  val dbConfigKey = conf.getString("timesheet-service.database-config-key")
-
-  lazy val ctx = new CassandraSyncContext[SnakeCase](dbConfigKey)
+  lazy val ctx = new CassandraSyncContext[SnakeCase](cassandraContextConfig)
 
   import ctx._
 

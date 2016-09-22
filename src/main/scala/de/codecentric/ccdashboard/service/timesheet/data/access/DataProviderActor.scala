@@ -11,7 +11,7 @@ import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.messages._
-import io.getquill.{CassandraAsyncContext, SnakeCase}
+import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success}
@@ -19,9 +19,8 @@ import scala.util.{Failure, Success}
 /**
   * Created by bjacobs on 18.07.16.
   */
-class DataProviderActor(conf: Config) extends Actor with ActorLogging {
-  val dbConfigKey = conf.getString("timesheet-service.database-config-key")
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](dbConfigKey)
+class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextConfig) extends Actor with ActorLogging {
+  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
 
   val importStartDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
 

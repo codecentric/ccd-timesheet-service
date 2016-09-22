@@ -12,6 +12,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
+import com.datastax.driver.core.{Cluster, SocketOptions}
 import com.github.bjoernjacobs.csup.CsUp
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
@@ -21,6 +22,8 @@ import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.codecentric.ccdashboard.service.timesheet.util._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
+import io.getquill.CassandraContextConfig
+import io.getquill.context.cassandra.cluster.ClusterBuilder
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -63,9 +66,15 @@ object TimesheetService extends App {
     * @param materializer
     */
   def startUp(implicit ec: ExecutionContext, materializer: Materializer) = {
+    val dbConfigKey = conf.getString("timesheet-service.database-config-key")
+    val dbConfig = conf.getConfig(dbConfigKey)
+
+    val socketOptions = new SocketOptions().setConnectTimeoutMillis(60000).setReadTimeoutMillis(60000)
+    val cassandraContextConfig = new CassandraContextConfigWithSocketOptions(dbConfig, socketOptions)
+
     // create and start our main actors and components
-    val dataImporter = system.actorOf(Props(new DataIngestActor(conf)), "data-importer")
-    val dataProvider = system.actorOf(Props(new DataProviderActor(conf)), "data-provider")
+    val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")
+    val dataProvider = system.actorOf(Props(new DataProviderActor(conf, cassandraContextConfig)), "data-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider), interface, port)
 
     system.scheduler.schedule(5.seconds, 30.seconds, new Runnable {

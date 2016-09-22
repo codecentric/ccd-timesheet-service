@@ -1,16 +1,17 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
-import akka.actor.{Actor, ActorLogging, ActorPath, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.messages.{Start, Stop}
 import de.codecentric.ccdashboard.service.timesheet.util.StatusRequest
+import io.getquill.CassandraContextConfig
 
 import scala.concurrent.duration._
 
 /**
   * Created by bjacobs on 12.07.16.
   */
-class DataIngestActor(conf: Config) extends Actor with ActorLogging {
+class DataIngestActor(conf: Config, cassandraContextConfig: CassandraContextConfig) extends Actor with ActorLogging {
 
   import context._
 
@@ -20,7 +21,7 @@ class DataIngestActor(conf: Config) extends Actor with ActorLogging {
 
       // Spawn DataWriter Actor for current database
       log.info("Spawning data-writer")
-      val dataWriterActor = context.system.actorOf(Props(new DataWriterActor(conf)), "data-writer")
+      val dataWriterActor = context.system.actorOf(Props(new DataWriterActor(conf, cassandraContextConfig)), "data-writer")
 
       // Spawn DataReader Actor for JIRA and provide ActorRef
       log.info("Spawning data-reader")
