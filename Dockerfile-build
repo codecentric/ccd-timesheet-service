@@ -2,4 +2,7 @@ FROM hseeberger/scala-sbt
 
 MAINTAINER Björn Jacobs <bjoern.jacobs@codecentric.de>
 
+RUN mkdir /data
+RUN chown 1000:1000 /data
+
 CMD sbt clean universal:packageBin
