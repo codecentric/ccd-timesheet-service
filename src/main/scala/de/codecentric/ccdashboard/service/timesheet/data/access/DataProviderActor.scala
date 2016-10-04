@@ -112,10 +112,9 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
   }
 
   def teamMembershipQuery(username: String) = {
-    ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
+    ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
       extractor = teamExtractor)
-      .map(team => (username, team.id, team.name, team.members.flatMap(_.get(username)).flatten))
-      .map(TeamMembershipQueryResult.tupled)
+      .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
   }
 
   def issueQuery(id: String): Quoted[Query[Issue]] = {
@@ -184,16 +183,14 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
       val toDate = to.getOrElse(new Date())
 
-      val employeeSinceDateFuture = teamMembershipQuery(username).map(_.dateFrom)
+      val employeeSinceDateFuture = teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
 
       val dateToUse = for {
-        employeeSinceDateOption <- employeeSinceDateFuture
+        employeeSinceDateList <- employeeSinceDateFuture
       } yield {
-        employeeSinceDateOption match {
-          case Some(employeeSinceDate) =>
-            if (employeeSinceDate.after(fromDate)) employeeSinceDate else fromDate
-          case None =>
-            fromDate
+        employeeSinceDateList match {
+          case Nil => fromDate
+          case list => List(list.min, fromDate).max
         }
       }
 
