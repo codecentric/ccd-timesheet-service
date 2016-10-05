@@ -128,6 +128,8 @@ package object messages {
 
   case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
 
+  case class JiraTempoUserAvailabilityQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
+
   case class EnrichWorklogQueryData(username: String, worklogs: List[Worklog], issues: List[Issue])
 
 }

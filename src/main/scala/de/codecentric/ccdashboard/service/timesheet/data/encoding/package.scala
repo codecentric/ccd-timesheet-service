@@ -9,9 +9,8 @@ import akka.http.scaladsl.unmarshalling.{Unmarshal, _}
 import akka.stream.Materializer
 import cats.data.Xor
 import de.codecentric.ccdashboard.service.timesheet.data.access.ReportAggregationResult
-import de.codecentric.ccdashboard.service.timesheet.data.model.jira.{JiraIssueFieldCustomField10084, JiraUserScheduleDay, JiraUserSchedules, JiraWorklog}
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
-import de.codecentric.ccdashboard.service.timesheet.messages
 import de.codecentric.ccdashboard.service.timesheet.messages.UserReportQueryResponse
 import io.circe.Decoder.Result
 import io.circe.generic.semiauto._
@@ -56,6 +55,17 @@ package object encoding {
   implicit val stringTupleEncoder = MappedEncoding[(String, String), String](t => t.toString)
 
   /* Encoders and decoders for Circe */
+  implicit val decodeLocalDate: Decoder[LocalDate] = Decoder.instance(c =>
+    c.as[String].flatMap(s =>
+      if ("" == s) Xor.left(DecodingFailure("Could not parse LocalDate - string is empty", c.history))
+      else {
+        try Xor.right(LocalDate.from(DateTimeFormatter.ISO_DATE.parse(s))) catch {
+          case ex: DateTimeParseException => Xor.left(DecodingFailure("Could not parse LocalDate", c.history))
+        }
+      }
+    )
+  )
+
   implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
     Json.fromString(dateIsoFormatter(date))
   )
@@ -102,15 +112,13 @@ package object encoding {
 
   implicit val jiraUserSchedulesDecoder: Decoder[JiraUserSchedules] = deriveDecoder[JiraUserSchedules]
 
+  implicit val jiraUserAvailabilityDecoder: Decoder[JiraUserAvailability] = deriveDecoder[JiraUserAvailability]
+
+  implicit val jiraUserAvailabilitiesDecoder: Decoder[JiraUserAvailabilities] = deriveDecoder[JiraUserAvailabilities]
+
   implicit val reportAggregationResultEncoder = deriveEncoder[ReportAggregationResult]
 
   implicit val userReportQueryResponseEncoder = deriveEncoder[UserReportQueryResponse]
-
-  /*  implicit val userSchedulesDecoder: Decoder[JiraUserSchedules] = new Decoder[JiraUserSchedules] {
-      override def apply(c: HCursor): Result[JiraUserSchedules] = {
-
-      }
-    }*/
 
   /* XML Marshallers */
   val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[List[JiraWorklog]]() {

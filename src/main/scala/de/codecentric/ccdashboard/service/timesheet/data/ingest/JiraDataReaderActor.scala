@@ -43,6 +43,9 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   override def authority = Uri.Authority(Uri.Host(host))
 
+  // Team-IDs to filter. 4 = codecentric ALL
+  val filteredTeamIds = Set(4)
+
   val aggregationActor = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
 
   val jiraUsersServicePath = jiraConf.getString("get-users-service-path")
@@ -51,6 +54,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
   val jiraTempoTeamMembersServicePath = jiraConf.getString("tempo.team-members-service-path")
   val jiraTempoWorklogsServicePath = jiraConf.getString("tempo.worklog-service-path")
   val jiraTempoUserScheduleServicePath = jiraConf.getString("tempo.user-schedule-service-path")
+  val jiraTempoUserAvailabilityServicePath = jiraConf.getString("tempo.user-membership-availablility-service-path")
 
   val accessToken = jiraConf.getString("access-token")
   val tempoApiToken = jiraConf.getString("tempo.api-token")
@@ -224,6 +228,9 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     case TempoUserScheduleQueryTask(username, startDate, endDate) =>
       log.debug("Jira user schedules task received.")
 
+      val jiraUserSchedulesPromise = Promise[JiraUserSchedules]
+      val jiraUserAvailabilitiesFuture = retrieveUserAvailabilities(username, startDate, endDate)
+
       val queryUri = getJiraTempoUserScheduleUri(username, localDateEncoder.f(startDate), localDateEncoder.f(endDate))
       handleRequest(queryUri, signRequest = true,
         // Success handler
@@ -231,9 +238,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           decode[JiraUserSchedules](jsonString) match {
             case Xor.Left(error) =>
               log.error(error, s"Could not decode Jira user schedule")
-            case Xor.Right(jiraUserSchedule) =>
-              val userSchedules = jiraUserSchedule.toUserSchedules(username)
-              dataWriter ! userSchedules
+            case Xor.Right(jiraUserSchedules) =>
+              jiraUserSchedulesPromise.success(jiraUserSchedules)
 
               lastRead = Some(LocalDateTime.now())
           }
@@ -242,6 +248,27 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         ex => {
           log.error(ex, s"TempoUserScheduleQueryTask task failed")
         })
+
+      for {
+        schedules <- jiraUserSchedulesPromise.future
+        availabilites <- jiraUserAvailabilitiesFuture
+      } yield {
+        val mostRecentAvailablilityValue = availabilites
+          .toUserAvailabilities
+          .content
+          .sortWith((l, r) => l.dateFrom.isAfter(r.dateFrom))
+          .headOption
+          .map(_.availability)
+
+        if (mostRecentAvailablilityValue.isEmpty) {
+          log.info(s"No availability value found for user $username, using fixed 100%")
+        }
+        val availability = mostRecentAvailablilityValue.getOrElse(1.0)
+
+        val result = schedules.toUserSchedules(username, availability)
+
+        dataWriter ! result
+      }
 
     case JiraIssueDetailsQueryTask(issueId: Either[String, Int]) =>
       val requester = sender()
@@ -332,6 +359,31 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         "last read" -> lastRead.map(_.toString).getOrElse("")))
   }
 
+  def retrieveUserAvailabilities(username: String, startDate: LocalDate, endDate: LocalDate) = {
+    val resultPromise = Promise[JiraUserAvailabilities]
+
+    val queryUri = getTempoUserAvailabilityUri(username, localDateEncoder.f(startDate), localDateEncoder.f(endDate))
+    handleRequest(queryUri, signRequest = true,
+      // Success handler
+      jsonEntityHandler(_)(jsonString => {
+        decode[List[JiraUserAvailability]](jsonString) match {
+          case Xor.Left(e) =>
+            log.error(e, s"Could not decode Tempo user availabilites")
+            resultPromise.failure(e)
+          case Xor.Right(x) =>
+            val f = x.filterNot(e => filteredTeamIds.contains(e.teamId))
+            resultPromise.success(JiraUserAvailabilities(f))
+        }
+      }),
+      // Error handler
+      e => {
+        resultPromise.failure(e)
+        log.error(e, s"TempoUserScheduleQueryTask task failed")
+      })
+
+    resultPromise.future
+  }
+
   def getWorklogRequestUri(fromDate: LocalDate, toDate: LocalDate) = {
     val queryString = Query(Map(
       "dateFrom" -> fromDate.toString,
@@ -384,5 +436,14 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
     Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
   }
 
+  def getTempoUserAvailabilityUri(username: String, from: Date, to: Date) = {
+    val path = Uri.Path(jiraTempoUserAvailabilityServicePath.format(username))
+    val queryString = Query(Map(
+      "from" -> dateIsoFormatter(from),
+      "to" -> dateIsoFormatter(to)
+    )).toString()
+
+    Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
+  }
 }
 

@@ -8,8 +8,8 @@ import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, Us
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
 case class JiraUserSchedules(days: List[JiraUserScheduleDay]) extends UserSchedulesable {
-  override def toUserSchedules(username: String): UserSchedules = {
-    val userScheduleList = days.map(d => UserSchedule(username, d.date, d.requiredSeconds / 3600.0))
+  override def toUserSchedules(username: String, availability: Double): UserSchedules = {
+    val userScheduleList = days.map(d => UserSchedule(username, d.date, (d.requiredSeconds / 3600.0) * availability))
     UserSchedules(username, userScheduleList)
   }
 }
