@@ -2,6 +2,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.typesafe.config.Config
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.jira.JiraDataReaderActor
 import de.codecentric.ccdashboard.service.timesheet.messages.{Start, Stop}
 import de.codecentric.ccdashboard.service.timesheet.util.StatusRequest
 import io.getquill.CassandraContextConfig

@@ -1,30 +1,27 @@
-package de.codecentric.ccdashboard.service.timesheet.data.ingest
+package de.codecentric.ccdashboard.service.timesheet.data.ingest.jira
 
-import java.time.format.DateTimeFormatter
 import java.time.{LocalDate, LocalDateTime}
 import java.util.Date
-import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.pattern.pipe
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import cats.data.Xor
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
-import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.{BaseDataReaderActor, DataAggregationActor, PerformUtilizationAggregation}
 import de.codecentric.ccdashboard.service.timesheet.data.model._
-import de.codecentric.ccdashboard.service.timesheet.messages.{EnrichWorklogQueryData, JiraIssueDetailsQueryTask, JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
+import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
+import de.codecentric.ccdashboard.service.timesheet.messages.{JiraIssueDetailsQueryTask, JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
 import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
 import io.circe.generic.auto._
 import io.circe.parser._
-import io.circe.java8.time._
 
-import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
 
 /**
@@ -48,28 +45,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   val aggregationActor = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
 
-  val jiraUsersServicePath = jiraConf.getString("get-users-service-path")
-  val jiraIssueDetailsServicePath = jiraConf.getString("get-issue-details-service-path")
-  val jiraTempoTeamServicePath = jiraConf.getString("tempo.team-service-path")
-  val jiraTempoTeamMembersServicePath = jiraConf.getString("tempo.team-members-service-path")
-  val jiraTempoWorklogsServicePath = jiraConf.getString("tempo.worklog-service-path")
-  val jiraTempoUserScheduleServicePath = jiraConf.getString("tempo.user-schedule-service-path")
-  val jiraTempoUserAvailabilityServicePath = jiraConf.getString("tempo.user-membership-availablility-service-path")
-
-  val accessToken = jiraConf.getString("access-token")
-  val tempoApiToken = jiraConf.getString("tempo.api-token")
-  val consumerPrivateKey = jiraConf.getString("consumer-private-key")
-
-  val timesheetProjectKey = conf.getString("timesheet-service.data-import.project-key")
-  val importStartDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
-  val importBatchSizeDays = conf.getDuration("timesheet-service.data-import.batch-size").toDays
-  val importSyncRangeDays = conf.getDuration("timesheet-service.data-import.sync-range").toDays
-  val importSyncInterval = FiniteDuration(conf.getDuration("timesheet-service.data-import.sync-interval").toMinutes, TimeUnit.MINUTES)
-  val importWaitBetweenBatches = {
-    val v = conf.getDuration("timesheet-service.data-import.wait-between-batches")
-    FiniteDuration(v.toNanos, TimeUnit.NANOSECONDS)
-  }
-  val importEndDate = importStartDate.plusDays(importBatchSizeDays)
+  val c = new JiraConfig(conf)
 
   // A few indicators or counters
   var completedUsersImportOnce = false
@@ -79,7 +55,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   import context.dispatcher
 
-  log.debug(s"Instantiated with: $scheme, $host, $jiraTempoWorklogsServicePath, $accessToken, $tempoApiToken, $consumerPrivateKey, $importStartDate, $importEndDate")
+  log.debug(s"Instantiated with: $scheme, $host, ${c.jiraTempoWorklogsServicePath}, ${c.accessToken}, ${c.tempoApiToken}, ${c.consumerPrivateKey}, ${c.importStartDate}, ${c.importEndDate}")
 
   def receive = {
     /**
@@ -89,7 +65,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       log.info("Received Start message -> commencing to query Jira")
       // Start Tempo Worklog Query async
       val now = LocalDate.now()
-      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = false))
+      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = false))
 
       // Start Jira User Queries async
       context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask())
@@ -144,26 +120,26 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           // Determine which task to query when
           val now = LocalDate.now()
           val nextImport = if (syncing) {
-            if (fromDate.isBefore(now.minusDays(importSyncRangeDays))) {
-              TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = true)
+            if (fromDate.isBefore(now.minusDays(c.importSyncRangeDays))) {
+              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
-              TempoWorklogQueryTask(fromDate, fromDate.minusDays(importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = true)
             }
           } else {
-            if (fromDate.isBefore(importStartDate)) {
+            if (fromDate.isBefore(c.importStartDate)) {
               completedWorklogsImportOnce = true
-              TempoWorklogQueryTask(now, now.minusDays(importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
-              TempoWorklogQueryTask(fromDate, fromDate.minusDays(importBatchSizeDays), syncing = false)
+              TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = false)
             }
           }
           lastRead = Some(LocalDateTime.now())
-          context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, nextImport)
+          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, nextImport)
         },
         // Error handler
         ex => {
-          log.error(ex, s"TempoWorklogQueryTask task failed. Rescheduling in $importWaitBetweenBatches")
-          context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, q)
+          log.error(ex, s"TempoWorklogQueryTask task failed. Rescheduling in ${c.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
         })
 
     case q@JiraUserQueryTask() =>
@@ -207,7 +183,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
       val userScheduleQuery = allUsers
         .map(_.content.map(_.name))
-        .map(_.map(username => TempoUserScheduleQueryTask(username, importStartDate, LocalDate.now())))
+        .map(_.map(username => TempoUserScheduleQueryTask(username, c.importStartDate, LocalDate.now())))
         .map(_.foreach(task => self ! task))
 
       allUsers.onComplete {
@@ -217,12 +193,12 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           lastRead = Some(LocalDateTime.now())
           completedUsersImportOnce = true
 
-          log.info(s"Scheduling next users-import in $importSyncInterval")
-          context.system.scheduler.scheduleOnce(importSyncInterval, self, q)
+          log.info(s"Scheduling next users-import in ${c.importSyncInterval}")
+          context.system.scheduler.scheduleOnce(c.importSyncInterval, self, q)
 
         case Failure(ex) =>
-          log.error(ex, s"Users-import failed. Rescheduling next users-import in $importWaitBetweenBatches")
-          context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, q)
+          log.error(ex, s"Users-import failed. Rescheduling next users-import in ${c.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
       }
 
     case TempoUserScheduleQueryTask(username, startDate, endDate) =>
@@ -311,8 +287,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         }),
         // Error handler
         ex => {
-          log.error(ex, s"JiraTempoTeamQueryTask task failed. Rescheduling in $importWaitBetweenBatches")
-          context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, q)
+          log.error(ex, s"JiraTempoTeamQueryTask task failed. Rescheduling in ${c.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
         })
 
     case q@JiraTempoTeamMembersQueryTask((teamId :: remainingTeamIds)) =>
@@ -333,8 +309,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           }
 
           if (remainingTeamIds.isEmpty) {
-            log.info(s"Scheduling next Teams import in $importSyncInterval")
-            context.system.scheduler.scheduleOnce(importSyncInterval, self, JiraTempoTeamQueryTask)
+            log.info(s"Scheduling next Teams import in ${c.importSyncInterval}")
+            context.system.scheduler.scheduleOnce(c.importSyncInterval, self, JiraTempoTeamQueryTask)
             completedTeamsImportOnce = true
           } else {
             log.debug(s"Scheduling team query for next team in 3 second")
@@ -343,8 +319,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         }),
         // Error handler
         ex => {
-          log.error(ex, s"Team members query for team $teamId failed. Rescheduling im $importWaitBetweenBatches")
-          context.system.scheduler.scheduleOnce(importWaitBetweenBatches, self, q)
+          log.error(ex, s"Team members query for team $teamId failed. Rescheduling im ${c.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
         })
 
     case StatusRequest(statusActor) =>
@@ -389,16 +365,16 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       "dateFrom" -> fromDate.toString,
       "dateTo" -> toDate.toString,
       "format" -> "xml",
-      "tempoApiToken" -> tempoApiToken,
-      "projectKey" -> timesheetProjectKey)).toString
+      "tempoApiToken" -> c.tempoApiToken,
+      "projectKey" -> c.timesheetProjectKey)).toString
 
-    val path = Uri.Path(jiraTempoWorklogsServicePath)
+    val path = Uri.Path(c.jiraTempoWorklogsServicePath)
 
     Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
   }
 
   def getJiraUsersRequestUri(mailSuffix: String) = {
-    val path = Uri.Path(jiraUsersServicePath)
+    val path = Uri.Path(c.jiraUsersServicePath)
     val queryString = Query(Map(
       "username" -> mailSuffix,
       "maxResults" -> "100000")).toString
@@ -411,22 +387,22 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       case Left(key) => key
       case Right(id) => id.toString
     }
-    val path = Uri.Path(jiraIssueDetailsServicePath) / issueIdString
+    val path = Uri.Path(c.jiraIssueDetailsServicePath) / issueIdString
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoTeamsUri = {
-    val path = Uri.Path(jiraTempoTeamServicePath)
+    val path = Uri.Path(c.jiraTempoTeamServicePath)
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoTeamMembersUri(teamId: Int) = {
-    val path = Uri.Path(jiraTempoTeamMembersServicePath.format(teamId.toString))
+    val path = Uri.Path(c.jiraTempoTeamMembersServicePath.format(teamId.toString))
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoUserScheduleUri(username: String, from: Date, to: Date) = {
-    val path = Uri.Path(jiraTempoUserScheduleServicePath)
+    val path = Uri.Path(c.jiraTempoUserScheduleServicePath)
     val queryString = Query(Map(
       "user" -> username,
       "from" -> dateIsoFormatter(from),
@@ -437,7 +413,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
   }
 
   def getTempoUserAvailabilityUri(username: String, from: Date, to: Date) = {
-    val path = Uri.Path(jiraTempoUserAvailabilityServicePath.format(username))
+    val path = Uri.Path(c.jiraTempoUserAvailabilityServicePath.format(username))
     val queryString = Query(Map(
       "from" -> dateIsoFormatter(from),
       "to" -> dateIsoFormatter(to)

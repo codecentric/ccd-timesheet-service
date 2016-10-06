@@ -3,7 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.source.jira
 import akka.actor.ActorDSL._
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import de.codecentric.ccdashboard.service.timesheet.data.ingest.JiraDataReaderActor
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.jira.JiraDataReaderActor
 import org.scalatest._
 
 /**
