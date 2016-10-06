@@ -5,10 +5,11 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings}
+import cats.data.Xor
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.oauth.{OAuthSignatureHelper, OAuthSignatureHelperConfig}
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -61,10 +62,33 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
         case HttpResponse(code, _, _, _) =>
           val exception = new RuntimeException(s"Response code was not 404 OK but: $code")
           failureHandler(exception)
+        case x: Any =>
+          log.warning(x.toString)
       }
       case Failure(ex) =>
         failureHandler(ex)
     }
+  }
+
+  def performAsyncHttpEntityQuery[T](uri: Uri, unmarshaller: (HttpEntity) => Future[T], errorMsg: String) = {
+    val resultPromise = Promise[T]
+
+    handleRequest(uri, signRequest = false,
+      // Success handler
+      entity => unmarshaller(entity).onComplete {
+        case Success(x) =>
+          resultPromise.success(x)
+        case Failure(e) =>
+          log.error(e, errorMsg)
+          resultPromise.failure(e)
+      },
+      // Error handler
+      e => {
+        resultPromise.failure(e)
+        log.error(e, errorMsg)
+      })
+
+    resultPromise.future
   }
 
   def jsonEntityHandler(entity: HttpEntity)(jsonHandlerFunction: String => Unit) = {
@@ -80,5 +104,28 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
         }
       case contentType => log.error(s"Invalid Content-Type of response: $contentType")
     }
+  }
+
+  def performAsyncJsonQuery[T](uri: Uri, decoder: (String) => Xor[io.circe.Error, T], errorMsg: String) = {
+    val resultPromise = Promise[T]
+
+    handleRequest(uri, signRequest = true,
+      // Success handler
+      jsonEntityHandler(_)(jsonString => {
+        decoder(jsonString) match {
+          case Xor.Left(e) =>
+            log.error(e, errorMsg)
+            resultPromise.failure(e)
+          case Xor.Right(x) =>
+            resultPromise.success(x)
+        }
+      }),
+      // Error handler
+      e => {
+        resultPromise.failure(e)
+        log.error(e, errorMsg)
+      })
+
+    resultPromise.future
   }
 }
