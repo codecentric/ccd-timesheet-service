@@ -108,7 +108,7 @@ object TimesheetService extends App {
     import Directives._
     import io.circe.generic.auto._
 
-    implicit val timeout = Timeout(15.seconds)
+    implicit val timeout = Timeout(60.seconds)
 
     /* Akka HTTP Unmarshallers */
     implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { ex => str =>
@@ -148,16 +148,16 @@ object TimesheetService extends App {
           get {
             parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
               val aggregationTypeTry = aggregationTypeString
-                .map(s => Try(UserReportQueryAggregationType.withName(s)))
-                .getOrElse(Success(UserReportQueryAggregationType.DAILY))
+                .map(s => Try(ReportQueryAggregationType.withName(s)))
+                .getOrElse(Success(ReportQueryAggregationType.DAILY))
 
               if (aggregationTypeTry.isFailure) {
-                failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${UserReportQueryAggregationType.values}"))
+                failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
               }
 
               val aggregationType = aggregationTypeTry.get
 
-              val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[UserReportQueryResponse]
+              val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
               onComplete(query) {
                 case Success(res) => complete(res)
                 case Failure(ex) => failWith(ex)
@@ -177,24 +177,46 @@ object TimesheetService extends App {
           }
         }
       } ~
-      pathPrefix("team" / IntNumber.?) { id =>
-        get {
-          pathEndOrSingleSlash {
-            val query = (dataProvider ? TeamQuery(id)).mapTo[TeamQueryResponse]
-            onComplete(query) {
-              case Success(res) => {
-                res.teams match {
-                  case Some(teams) =>
-                    val content = teams.content
-                    if (content.size == 1) complete(content.head)
-                    else complete(content)
-                  case None => complete()
-                }
+      pathPrefix("team") {
+        path(IntNumber.?) { id =>
+          get {
+            pathEndOrSingleSlash {
+              val query = (dataProvider ? TeamQuery(id)).mapTo[TeamQueryResponse]
+              onComplete(query) {
+                case Success(res) =>
+                  res.teams match {
+                    case Some(teams) =>
+                      val content = teams.content
+                      if (content.size == 1) complete(content.head)
+                      else complete(content)
+                    case None => complete()
+                  }
+                case Failure(ex) => failWith(ex)
               }
-              case Failure(ex) => failWith(ex)
             }
           }
-        }
+        } ~
+          path(IntNumber / "report") { id =>
+            get {
+              parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
+                val aggregationTypeTry = aggregationTypeString
+                  .map(s => Try(ReportQueryAggregationType.withName(s)))
+                  .getOrElse(Success(ReportQueryAggregationType.DAILY))
+
+                if (aggregationTypeTry.isFailure) {
+                  failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
+                }
+
+                val aggregationType = aggregationTypeTry.get
+
+                val query = (dataProvider ? TeamReportQuery(id, from, to, aggregationType)).mapTo[ReportQueryResponse]
+                onComplete(query) {
+                  case Success(res) => complete(res)
+                  case Failure(ex) => failWith(ex)
+                }
+              }
+            }
+          }
       } ~
       pathPrefix("status") {
         get {

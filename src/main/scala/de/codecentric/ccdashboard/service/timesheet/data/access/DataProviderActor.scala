@@ -5,6 +5,8 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
+import akka.pattern.ask
+import akka.util.Timeout
 import com.datastax.driver.core.{Row, TypeTokens}
 import com.google.common.reflect.TypeToken
 import com.typesafe.config.Config
@@ -14,7 +16,10 @@ import de.codecentric.ccdashboard.service.timesheet.messages._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import scala.concurrent.duration._
+
 
 /**
   * Created by bjacobs on 18.07.16.
@@ -121,6 +126,45 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     query[Issue].filter(_.id == lift(id))
   }
 
+  def getEmployeeSpecificDateRange(from: Option[Date], to: Option[Date], username: String) = {
+    val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
+    val toDate = to.getOrElse(new Date())
+
+    val employeeSinceDateFuture = teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
+
+    val dateToUse = for {
+      employeeSinceDateList <- employeeSinceDateFuture
+    } yield {
+      employeeSinceDateList match {
+        case Nil => fromDate
+        case list => List(list.min, fromDate).max
+      }
+    }
+    (dateToUse, toDate)
+  }
+
+  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)], workSchedule: List[UserSchedule], aggregationType: ReportQueryAggregationType.Value) = {
+    val aggregator = ReportAggregator(reports, workSchedule)
+    // Aggregate Reports
+    aggregationType match {
+      case ReportQueryAggregationType.DAILY =>
+        aggregator.aggregateDaily()
+
+      case ReportQueryAggregationType.MONTHLY =>
+        aggregator.aggregateMonthly()
+
+      case ReportQueryAggregationType.YEARLY =>
+        aggregator.aggregateYearly()
+    }
+  }
+
+
+  def generateReportQueryResponse(fromDate: Date, toDate: Date, aggregationResultFuture: Future[ReportAggregationResult], aggregationType: ReportQueryAggregationType.Value) =
+    aggregationResultFuture.map { aggregationResult => {
+      ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
+    }
+    }
+
   def receive: Receive = {
     case WorklogQuery(username, from, to) =>
       val requester = sender()
@@ -180,54 +224,79 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     case UserReportQuery(username, from, to, aggregationType) =>
       val requester = sender()
 
+      val (fromDate, toDate) = getEmployeeSpecificDateRange(from, to, username)
+
+      val resultFut = for {
+        date <- fromDate
+        utilizationReports <- ctx.run(userReport(username, date, toDate))
+        workSchedule <- ctx.run(userSchedule(username, date, toDate))
+      } yield {
+        val reports = utilizationReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
+        val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
+
+        ReportQueryResponse(date, toDate, aggregationType.toString, aggregationResult)
+      }
+
+      resultFut.pipeTo(requester)
+
+    case TeamReportQuery(teamId, from, to, aggregationType) =>
+      val requester = sender()
+
       val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
       val toDate = to.getOrElse(new Date())
 
-      val employeeSinceDateFuture = teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
+      // get all users from the team
+      val teamFut = ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE id = $teamId",
+        extractor = teamExtractor
+      )
 
-      val dateToUse = for {
-        employeeSinceDateList <- employeeSinceDateFuture
-      } yield {
-        employeeSinceDateList match {
-          case Nil => fromDate
-          case list => List(list.min, fromDate).max
+      teamFut.map(team => {
+        val usernames = team.members.map(_.keys).getOrElse(Nil)
+
+        implicit val timeout = Timeout(60.seconds)
+
+        val usersReportsFut = Future.sequence(usernames.map(username => {
+          (self ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
+        }))
+
+        val resultFut = for {
+          allReportAggregations <- usersReportsFut.map(_.map(_.result))
+        } yield {
+          val list = allReportAggregations.toList
+          val allReports = list.flatMap(_.reports)
+          val size = list.size
+          val overallHoursRequiredList = list.map(_.overallHoursRequired)
+          val overallBillableHoursList = list.map(_.overallBillableHours)
+          val overallUtilizationList = list.map(_.overallUtilization)
+          val keyGroupedReports = allReports.groupBy(_.key)
+
+          val teamReportAggregation = keyGroupedReports.map {
+            case (key, reportAggregations) =>
+              val reports = reportAggregations.map(_.report)
+              val utilization = reportAggregations.map(_.utilization)
+              //val numberOfConsultants = reports.size
+
+              val reducedReports = reports.reduce((l, r) => l + r)
+              val reducedUtilization = utilization.sum / utilization.size
+
+              ReportAggregation(key, reducedReports, reducedUtilization)
+          }
+
+          val overallHoursRequired = overallHoursRequiredList.sum
+          val overallBillableHours = overallBillableHoursList.sum
+          val overallUtilization = overallUtilizationList.sum / size
+          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, teamReportAggregation.toList.sortBy(_.key))
+          ReportQueryResponse(fromDate, toDate, aggregationType.toString, result)
         }
+
+        resultFut.pipeTo(requester)
       }
+      )
 
-      val utilizationReportsFuture = dateToUse.flatMap(date => ctx.run(userReport(username, date, toDate)))
+    // get stats from all users
 
-      val workScheduleFuture = dateToUse.flatMap(date => userScheduleQuery(username, date, toDate))
+    // sum up values then calculate utilization
 
-      // Map utilization reports to general Reports
-      val reportsFuture = utilizationReportsFuture
-        .map(_.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours))))
-
-      val aggregationResultFuture = for {
-        reports <- reportsFuture
-        workSchedule <- workScheduleFuture
-      } yield {
-        val aggregator = ReportAggregator(reports, workSchedule)
-
-        // Aggregate Reports
-        aggregationType match {
-          case UserReportQueryAggregationType.DAILY =>
-            aggregator.aggregateDaily()
-
-          case UserReportQueryAggregationType.MONTHLY =>
-            aggregator.aggregateMonthly()
-
-          case UserReportQueryAggregationType.YEARLY =>
-            aggregator.aggregateYearly()
-        }
-      }
-
-      val resultFuture = for {
-        date <- dateToUse
-        aggregationResult <- aggregationResultFuture
-      } yield {
-        UserReportQueryResponse(date, toDate, aggregationType.toString, aggregationResult)
-      }
-
-      resultFuture.pipeTo(requester)
+    // add numberOfConsultants, hoursPerDay, hoursPerConsultantPerMonth
   }
 }

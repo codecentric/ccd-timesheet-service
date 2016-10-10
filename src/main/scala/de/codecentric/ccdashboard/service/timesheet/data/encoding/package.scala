@@ -11,7 +11,7 @@ import cats.data.Xor
 import de.codecentric.ccdashboard.service.timesheet.data.access.ReportAggregationResult
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
-import de.codecentric.ccdashboard.service.timesheet.messages.UserReportQueryResponse
+import de.codecentric.ccdashboard.service.timesheet.messages.ReportQueryResponse
 import io.circe.Decoder.Result
 import io.circe.generic.semiauto._
 import io.circe.generic.auto._
@@ -118,7 +118,7 @@ package object encoding {
 
   implicit val reportAggregationResultEncoder = deriveEncoder[ReportAggregationResult]
 
-  implicit val userReportQueryResponseEncoder = deriveEncoder[UserReportQueryResponse]
+  implicit val userReportQueryResponseEncoder = deriveEncoder[ReportQueryResponse]
 
   /* XML Marshallers */
   val jiraWorklogUnmarshaller = new FromEntityUnmarshaller[List[JiraWorklog]]() {

@@ -70,9 +70,11 @@ package object messages {
     */
   case class TeamQueryResponse(teams: Option[Teams])
 
-  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: UserReportQueryAggregationType.Value)
+  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 
-  object UserReportQueryAggregationType extends Enumeration {
+  case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+
+  object ReportQueryAggregationType extends Enumeration {
     val DAILY = Value("daily")
     val MONTHLY = Value("monthly")
     val YEARLY = Value("yearly")
@@ -108,7 +110,7 @@ package object messages {
     }
   }
 
-  case class UserReportQueryResponse(dateFrom: Date, dateTo: Date, aggregation: String, result: ReportAggregationResult)
+  case class ReportQueryResponse(dateFrom: Date, dateTo: Date, aggregation: String, result: ReportAggregationResult)
 
   case class Report(date: Date, report: ReportEntry)
 
