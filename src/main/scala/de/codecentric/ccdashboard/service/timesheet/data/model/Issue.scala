@@ -44,8 +44,8 @@ object Issue {
         case "TS-5" => Issue.Types.ILLNESS
         case "TS-6" => Issue.Types.TRAVELTIME
         case "TS-7" => Issue.Types.TWENTYPERCENT
-        case "TS-8" => Issue.Types.ABSENCE
-        case "TS-9" => Issue.Types.PARENTALLEAVE
+        case "TS-147" => Issue.Types.ABSENCE
+        case "TS-345" => Issue.Types.PARENTALLEAVE
         case _ => Issue.Types.OTHER
       }
     }
