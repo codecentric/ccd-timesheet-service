@@ -19,7 +19,7 @@ import io.circe.parser._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -154,7 +154,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         instanaUsers <- instanaUsersPromise.future
       } yield Users(ccUsers ++ instanaUsers)
 
-      val userScheduleQuery = allUsers
+      // tribger update of user schedule queries
+      allUsers
         .map(_.content.map(_.name))
         .map(_.map(username => TempoUserScheduleQueryTask(username, c.importStartDate, LocalDate.now())))
         .map(_.foreach(task => self ! task))
