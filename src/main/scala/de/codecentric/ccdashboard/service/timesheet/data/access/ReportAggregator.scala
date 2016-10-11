@@ -77,6 +77,6 @@ object ReportAggregator {
   private val yearFormatter = DateTimeFormatter.ofPattern("yyyy")
 }
 
-case class ReportAggregation(key: String, report: ReportEntry, utilization: Double)
+case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, numberOfConsultants: Int = 1)
 
 case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, reports: List[ReportAggregation])

@@ -274,12 +274,12 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
             case (key, reportAggregations) =>
               val reports = reportAggregations.map(_.report)
               val utilization = reportAggregations.map(_.utilization)
-              //val numberOfConsultants = reports.size
+              val numberOfConsultants = reports.size
 
               val reducedReports = reports.reduce((l, r) => l + r)
               val reducedUtilization = utilization.sum / utilization.size
 
-              ReportAggregation(key, reducedReports, reducedUtilization)
+              ReportAggregation(key, reducedReports, reducedUtilization, numberOfConsultants)
           }
 
           val overallHoursRequired = overallHoursRequiredList.sum
@@ -292,11 +292,5 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
         resultFut.pipeTo(requester)
       }
       )
-
-    // get stats from all users
-
-    // sum up values then calculate utilization
-
-    // add numberOfConsultants, hoursPerDay, hoursPerConsultantPerMonth
   }
 }
