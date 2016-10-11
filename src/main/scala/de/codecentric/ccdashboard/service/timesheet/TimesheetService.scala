@@ -220,12 +220,19 @@ object TimesheetService extends App {
       } ~
       pathPrefix("status") {
         get {
+          val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]
+
           pathEndOrSingleSlash {
-            val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]
             onComplete(query) {
               case Success(res) => complete(res.statusMap)
               case Failure(ex) => failWith(ex)
             }
+          } ~
+            pathSuffix("q") {
+              onComplete(query) {
+                case Success(res) => complete(res.importCompleted)
+                case Failure(ex) => failWith(ex)
+              }
           }
         }
       }

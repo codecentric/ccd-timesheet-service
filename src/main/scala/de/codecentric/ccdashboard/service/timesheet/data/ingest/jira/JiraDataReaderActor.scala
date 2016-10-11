@@ -257,17 +257,19 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       }
 
     case StatusRequest(statusActor) =>
+      val importStatusList = List(completedUsersImportOnce, completedTeamsImportOnce, completedWorklogsImportOnce)
+
       val List(usersImportStatus, teamsImportStatus, worklogsImportStatus) =
-        List(completedUsersImportOnce, completedTeamsImportOnce, completedWorklogsImportOnce)
-          .map(f => if (f) "syncing" else "importing")
+        importStatusList.map(f => if (f) "syncing" else "importing")
 
       statusActor ! StatusNotification("JiraDataReader", Map(
         "users import status" -> usersImportStatus,
         "teams import status" -> teamsImportStatus,
         "worklogs import status" -> worklogsImportStatus,
-        "last read" -> lastRead.map(_.toString).getOrElse("")))
+        "last read" -> lastRead.map(_.toString).getOrElse("")),
+        Some(importStatusList.forall(identity))
+      )
   }
-
 
   def retrieveUserAvailabilities(username: String, startDate: LocalDate, endDate: LocalDate) = {
     val queryUri = getTempoUserAvailabilityUri(username, localDateEncoder.f(startDate), localDateEncoder.f(endDate))
