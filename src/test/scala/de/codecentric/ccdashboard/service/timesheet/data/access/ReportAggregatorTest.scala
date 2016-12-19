@@ -56,4 +56,10 @@ class ReportAggregatorTest extends FunSuite {
     assert((m("2015").utilization - 0.5).abs < 0.01)
     assert((m("2016").utilization - 0.5).abs < 0.01)
   }
+
+  test("daysWithoutBookedHours") {
+    val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
+    assert(daysWithoutBookedHours.size == 1)
+    assert(daysWithoutBookedHours.contains(dateFormat.parse("2015-07-03")))
+  }
 }

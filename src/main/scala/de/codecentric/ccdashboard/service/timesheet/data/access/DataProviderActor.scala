@@ -285,7 +285,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
           val overallHoursRequired = overallHoursRequiredList.sum
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = overallUtilizationList.sum / size
-          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, teamReportAggregation.toList.sortBy(_.key))
+          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(fromDate, toDate, aggregationType.toString, result)
         }
 

@@ -18,6 +18,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   val overallHoursRequired = workSchedule.map(_.requiredHours).sum
   val overallBillableHours = reports.flatMap(_._2.billableHours).sum
   val overallUtilization = utilization(overallHoursRequired, overallBillableHours)
+  val daysWithoutBookedHours = getDaysWithoutBookedHours()
 
   def aggregateDaily() = aggregate(dayFormatter)
 
@@ -34,6 +35,12 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     */
   private def utilization(hoursToWork: Double, billableHours: Double) = {
     if (hoursToWork < 1) billableHours else billableHours / hoursToWork
+  }
+
+  private def getDaysWithoutBookedHours() = {
+    val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList;
+    val datesWithBooking = reports.groupBy(_._1).keys.toList;
+    datesRequireBooking.filterNot(date => datesWithBooking.contains(date));
   }
 
   private def aggregate(formatter: DateTimeFormatter) = {
@@ -65,7 +72,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
     val reportsList = sortedValuesByKey.map({ case (key, (report, utilization)) => ReportAggregation(key, report, utilization) })
 
-    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, reportsList)
+    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, daysWithoutBookedHours, reportsList)
   }
 }
 
@@ -79,4 +86,4 @@ object ReportAggregator {
 
 case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, numberOfConsultants: Int = 1)
 
-case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, reports: List[ReportAggregation])
+case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, daysWithoutBookedHours: List[Date], reports: List[ReportAggregation])
