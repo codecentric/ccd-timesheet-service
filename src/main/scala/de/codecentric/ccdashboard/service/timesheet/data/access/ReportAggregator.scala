@@ -38,9 +38,9 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   }
 
   private def getDaysWithoutBookedHours() = {
-    val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList;
-    val datesWithBooking = reports.groupBy(_._1).keys.toList;
-    datesRequireBooking.filterNot(date => datesWithBooking.contains(date));
+    val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList
+    val datesWithBooking = reports.groupBy(_._1).keys.toList
+    datesRequireBooking.filterNot(date => datesWithBooking.contains(date)).sortWith(_.getTime < _.getTime)
   }
 
   private def aggregate(formatter: DateTimeFormatter) = {
