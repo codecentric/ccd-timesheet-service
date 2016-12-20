@@ -23,9 +23,6 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   val overallBillableHours = reports.flatMap(_._2.billableHours).sum
   val overallUtilization = utilization(overallHoursRequired, overallBillableHours)
   val daysWithoutBookedHours = getDaysWithoutBookedHours()
-  val usedVacationHours = getUsedVacationHours()
-  val plannedVacationHours = getPlannedVacationHours()
-  val freeVacationHours = 30 * 8 - usedVacationHours - plannedVacationHours
 
   def aggregateDaily() = aggregate(dayFormatter)
 
@@ -43,19 +40,6 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   private def utilization(hoursToWork: Double, billableHours: Double) = {
     if (hoursToWork < 1) billableHours else billableHours / hoursToWork
   }
-
-  private def getUsedVacationHours() = {
-    val allPastReports = reports.filter(_._1.before(tomorrow))
-    allPastReports.flatMap(_._2.vacationHours).sum
-  }
-
-  private def getPlannedVacationHours() = {
-    val allPastReports = reports.filter(_._1.after(today))
-    allPastReports.flatMap(_._2.vacationHours).sum
-  }
-
-
-
 
   private def getDaysWithoutBookedHours() = {
     val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList
@@ -96,7 +80,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
     val reportsList = sortedValuesByKey.map({ case (key, (report, utilization)) => ReportAggregation(key, report, utilization) })
 
-    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, daysWithoutBookedHours, usedVacationHours, plannedVacationHours, freeVacationHours,  reportsList)
+    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, daysWithoutBookedHours, reportsList)
   }
 }
 
@@ -110,4 +94,4 @@ object ReportAggregator {
 
 case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, numberOfConsultants: Int = 1)
 
-case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, daysWithoutBookedHours: List[Date], usedVacationHours: Double, plannedVacationHours: Double, freeVacationHours: Double, reports: List[ReportAggregation])
+case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, daysWithoutBookedHours: List[Date], reports: List[ReportAggregation])
