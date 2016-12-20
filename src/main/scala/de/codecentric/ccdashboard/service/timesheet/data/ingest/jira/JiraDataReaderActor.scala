@@ -1,5 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest.jira
 
+import java.time.temporal.TemporalAdjusters
 import java.time.{LocalDate, LocalDateTime}
 
 import akka.actor.{ActorRef, Props}
@@ -109,17 +110,17 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           enrichmentRequests.map(_.foreach(r => aggregationActor ! PerformUtilizationAggregation(r._1, r._2, r._3)))
 
           // Determine which task to query when
-          val now = LocalDate.now()
+          val toDate = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
           val nextImport = if (syncing) {
-            if (fromDate.isBefore(now.minusDays(c.importSyncRangeDays))) {
-              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
+            if (fromDate.isBefore(toDate.minusDays(c.importSyncRangeDays))) {
+              TempoWorklogQueryTask(toDate, toDate.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = true)
             }
           } else {
             if (fromDate.isBefore(c.importStartDate)) {
               completedWorklogsImportOnce = true
-              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(toDate, toDate.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = false)
             }
