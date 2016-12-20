@@ -1,5 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
+import java.time.{LocalDate, ZoneId}
 import java.time.format.DateTimeFormatter
 import java.util.Date
 
@@ -39,8 +40,12 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
   private def getDaysWithoutBookedHours() = {
     val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList
+    val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
     val datesWithBooking = reports.groupBy(_._1).keys.toList
-    datesRequireBooking.filterNot(date => datesWithBooking.contains(date)).sortWith(_.getTime < _.getTime)
+    datesRequireBooking.filterNot(date => datesWithBooking.contains(date))
+                       .filterNot(date => date.equals(today))
+                       .sortWith(_.getTime < _.getTime)
+
   }
 
   private def aggregate(formatter: DateTimeFormatter) = {

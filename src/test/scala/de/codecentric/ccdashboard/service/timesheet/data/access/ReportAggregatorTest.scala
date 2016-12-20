@@ -1,6 +1,8 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
 import java.text.SimpleDateFormat
+import java.time.{LocalDate, ZoneId}
+import java.util.Date
 
 import de.codecentric.ccdashboard.service.timesheet.data.model.UserSchedule
 import de.codecentric.ccdashboard.service.timesheet.messages.ReportEntry
@@ -20,13 +22,16 @@ class ReportAggregatorTest extends FunSuite {
     ("2016-09-01", ReportEntry(billableHours = Some(8)))
   )
 
+  val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+
   val workSchedules = List(
     ("abc", "2015-07-01", 8.0),
     ("abc", "2015-07-02", 8.0),
     ("abc", "2015-07-03", 8.0),
     ("abc", "2016-08-01", 8.0),
     ("abc", "2016-08-03", 8.0),
-    ("abc", "2016-09-01", 8.0)
+    ("abc", "2016-09-01", 8.0),
+    ("abc", dateFormat.format(today), 8.0)
   )
 
   val mappedWorkSchedules = workSchedules.map({ case (username, dateString, hours) => UserSchedule(username, dateFormat.parse(dateString), hours) })
@@ -54,12 +59,17 @@ class ReportAggregatorTest extends FunSuite {
   test("testAggregateYearly") {
     val m = agg.aggregateYearly().reports.map(x => x.key -> x).toMap
     assert((m("2015").utilization - 0.5).abs < 0.01)
-    assert((m("2016").utilization - 0.5).abs < 0.01)
+    assert((m("2016").utilization - 0.375).abs < 0.01)
   }
 
   test("daysWithoutBookedHours") {
     val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
     assert(daysWithoutBookedHours.size == 1)
     assert(daysWithoutBookedHours.contains(dateFormat.parse("2015-07-03")))
+  }
+
+  test("daysWithoutBookedHours should not contain today") {
+    val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
+    assert(!daysWithoutBookedHours.contains(dateFormat.format(today)))
   }
 }
