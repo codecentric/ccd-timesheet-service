@@ -47,8 +47,10 @@ object TimesheetService extends App {
   val statusActor = system.actorOf(Props[StatusActor], "status-actor")
   statusActor ! StatusNotification("TimesheetService", Map("status" -> "booting"))
 
-  // try to acquire connection to database and perform initialization
-  Await.result(CsUp().init(), Duration.Inf)
+  // if set, try to acquire connection to database and perform initialization
+  if (conf.getBoolean("timesheet-service.initializeDatabase")) {
+    Await.result(CsUp().init(), Duration.Inf)
+  }
 
   val httpServerBinding = startUp
 

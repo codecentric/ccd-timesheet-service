@@ -26,8 +26,9 @@ import scala.util.{Failure, Success}
   */
 
 class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataReaderActor(dataWriter) with JiraRequestUriGenerators {
+  val databaseHasBeenInitialized: Boolean = conf.getBoolean("timesheet-service.initializeDatabase")
 
-  val jiraConf = ConfigFactory.load("jiraclient.conf").getConfig("jira")
+  val jiraConf: Config = ConfigFactory.load("jiraclient.conf").getConfig("jira")
 
   override def getOAuthConfig = Some(jiraConf)
 
@@ -40,14 +41,14 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
   // Team-IDs to filter. 4 = codecentric ALL
   val filteredTeamIds = Set(4)
 
-  val aggregationActor = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
+  val aggregationActor: ActorRef = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
 
   val c = new JiraConfig(jiraConf, conf)
 
   // A few indicators or counters
-  var completedUsersImportOnce = false
-  var completedTeamsImportOnce = false
-  var completedWorklogsImportOnce = false
+  var completedUsersImportOnce: Boolean = !databaseHasBeenInitialized
+  var completedTeamsImportOnce: Boolean = !databaseHasBeenInitialized
+  var completedWorklogsImportOnce: Boolean = !databaseHasBeenInitialized
   var lastRead: Option[LocalDateTime] = None
 
   import context.dispatcher
@@ -62,7 +63,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       log.info("Received Start message -> commencing to query Jira")
       // Start Tempo Worklog Query async
       val now = LocalDate.now()
-      context.system.scheduler.scheduleOnce(0.seconds, self, TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = false))
+      context.system.scheduler.scheduleOnce(0.seconds, self,
+        TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = !databaseHasBeenInitialized))
 
       // Start Jira User Queries async
       context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask())
