@@ -262,13 +262,16 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
         val resultFut = for {
           allReportAggregations <- usersReportsFut.map(_.map(_.result))
         } yield {
-          val list = allReportAggregations.toList
-          val allReports = list.flatMap(_.reports)
-          val size = list.size
-          val overallHoursRequiredList = list.map(_.overallHoursRequired)
-          val overallBillableHoursList = list.map(_.overallBillableHours)
-          val overallUtilizationList = list.map(_.overallUtilization)
+          val allReportAggregationsList = allReportAggregations.toList
+          val allReports = allReportAggregationsList.flatMap(_.reports)
+          val size = allReportAggregationsList.size
+          val overallHoursRequiredList = allReportAggregationsList.map(_.overallHoursRequired)
+          val overallBillableHoursList = allReportAggregationsList.map(_.overallBillableHours)
+          val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
           val keyGroupedReports = allReports.groupBy(_.key)
+          val usedVacationHoursList = allReportAggregationsList.map(_.usedVacationHours)
+          val plannedVacationHoursList = allReportAggregationsList.map(_.plannedVacationHours)
+          val freeVacationHoursList = allReportAggregationsList.map(_.freeVacationHours)
 
           val teamReportAggregation = keyGroupedReports.map {
             case (key, reportAggregations) =>
@@ -285,7 +288,10 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
           val overallHoursRequired = overallHoursRequiredList.sum
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = overallUtilizationList.sum / size
-          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), teamReportAggregation.toList.sortBy(_.key))
+          val usedVacationHours = usedVacationHoursList.sum
+          val plannedVacationHours = plannedVacationHoursList.sum
+          val freeVacationHours = freeVacationHoursList.sum
+          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), usedVacationHours, plannedVacationHours, freeVacationHours, teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(fromDate, toDate, aggregationType.toString, result)
         }
 

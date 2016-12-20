@@ -4,3 +4,5 @@
 /project/target/
 /project/project/
 /bin/
+src/main/main.iml
+src/test/test.iml

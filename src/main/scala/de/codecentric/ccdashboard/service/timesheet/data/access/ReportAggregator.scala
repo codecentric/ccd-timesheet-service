@@ -16,10 +16,16 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
   import ReportAggregator._
 
+  val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+  val tomorrow = Date.from(LocalDate.now().plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+
   val overallHoursRequired = workSchedule.map(_.requiredHours).sum
   val overallBillableHours = reports.flatMap(_._2.billableHours).sum
   val overallUtilization = utilization(overallHoursRequired, overallBillableHours)
   val daysWithoutBookedHours = getDaysWithoutBookedHours()
+  val usedVacationHours = getUsedVacationHours()
+  val plannedVacationHours = getPlannedVacationHours()
+  val freeVacationHours = 30 * 8 - usedVacationHours - plannedVacationHours
 
   def aggregateDaily() = aggregate(dayFormatter)
 
@@ -38,9 +44,22 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     if (hoursToWork < 1) billableHours else billableHours / hoursToWork
   }
 
+  private def getUsedVacationHours() = {
+    val allPastReports = reports.filter(_._1.before(tomorrow))
+    allPastReports.flatMap(_._2.vacationHours).sum
+  }
+
+  private def getPlannedVacationHours() = {
+    val allPastReports = reports.filter(_._1.after(today))
+    allPastReports.flatMap(_._2.vacationHours).sum
+  }
+
+
+
+
   private def getDaysWithoutBookedHours() = {
     val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList
-    val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+
     val datesWithBooking = reports.groupBy(_._1).keys.toList
     datesRequireBooking.filterNot(date => datesWithBooking.contains(date))
                        .filterNot(date => date.equals(today))
@@ -77,7 +96,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
     val reportsList = sortedValuesByKey.map({ case (key, (report, utilization)) => ReportAggregation(key, report, utilization) })
 
-    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, daysWithoutBookedHours, reportsList)
+    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, daysWithoutBookedHours, usedVacationHours, plannedVacationHours, freeVacationHours,  reportsList)
   }
 }
 
@@ -91,4 +110,4 @@ object ReportAggregator {
 
 case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, numberOfConsultants: Int = 1)
 
-case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, daysWithoutBookedHours: List[Date], reports: List[ReportAggregation])
+case class ReportAggregationResult(overallHoursRequired: Double, overallBillableHours: Double, overallUtilization: Double, daysWithoutBookedHours: List[Date], usedVacationHours: Double, plannedVacationHours: Double, freeVacationHours: Double, reports: List[ReportAggregation])
