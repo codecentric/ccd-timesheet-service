@@ -112,8 +112,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
           // Determine which task to query when
           val lastDayOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
-          val now = LocalDate.now()
-          val daysUntilEndOfYear = ChronoUnit.DAYS.between(now, lastDayOfYear)
+          val daysUntilEndOfYear = ChronoUnit.DAYS.between(LocalDate.now(), lastDayOfYear)
           val syncRangeDays = c.importSyncRangeDays + daysUntilEndOfYear
 
           val nextImport = if (syncing) {
