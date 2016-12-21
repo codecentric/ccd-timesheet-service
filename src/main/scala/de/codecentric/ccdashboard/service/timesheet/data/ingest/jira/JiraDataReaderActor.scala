@@ -43,7 +43,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   val aggregationActor: ActorRef = context.actorOf(Props(new DataAggregationActor(conf, dataWriter)))
 
-  val c = new JiraConfig(jiraConf, conf)
+  val jiraConfig = new JiraConfig(jiraConf, conf)
 
   // A few indicators or counters
   var completedUsersImportOnce: Boolean = !databaseHasBeenInitialized
@@ -53,7 +53,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
 
   import context.dispatcher
 
-  log.debug(s"Instantiated with: $scheme, $host, ${c.jiraTempoWorklogsServicePath}, ${c.accessToken}, ${c.tempoApiToken}, ${c.consumerPrivateKey}, ${c.importStartDate}, ${c.importEndDate}")
+  log.debug(s"Instantiated with: $scheme, $host, ${jiraConfig.jiraTempoWorklogsServicePath}, ${jiraConfig.accessToken}, ${jiraConfig.tempoApiToken}, ${jiraConfig.consumerPrivateKey}, ${jiraConfig.importStartDate}, ${jiraConfig.importEndDate}")
 
   def receive = {
     /**
@@ -64,7 +64,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       // Start Tempo Worklog Query async
       val now = LocalDate.now()
       context.system.scheduler.scheduleOnce(0.seconds, self,
-        TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = !databaseHasBeenInitialized))
+        TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = !databaseHasBeenInitialized))
 
       // Start Jira User Queries async
       context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask())
@@ -111,25 +111,25 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           // Determine which task to query when
           val now = LocalDate.now()
           val nextImport = if (syncing) {
-            if (fromDate.isBefore(now.minusDays(c.importSyncRangeDays))) {
-              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
+            if (fromDate.isBefore(now.minusDays(jiraConfig.importSyncRangeDays))) {
+              TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             } else {
-              TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(fromDate, fromDate.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             }
           } else {
-            if (fromDate.isBefore(c.importStartDate)) {
+            if (fromDate.isBefore(jiraConfig.importStartDate)) {
               completedWorklogsImportOnce = true
-              TempoWorklogQueryTask(now, now.minusDays(c.importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             } else {
-              TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = false)
+              TempoWorklogQueryTask(fromDate, fromDate.minusDays(jiraConfig.importBatchSizeDays), syncing = false)
             }
           }
           lastRead = Some(LocalDateTime.now())
-          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, nextImport)
+          context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, nextImport)
 
         case Failure(e) =>
-          log.error(e, s"TempoWorklogQueryTask task failed. Rescheduling in ${c.importWaitBetweenBatches}")
-          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
+          log.error(e, s"TempoWorklogQueryTask task failed. Rescheduling in ${jiraConfig.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
 
     case q@JiraUserQueryTask() =>
@@ -159,7 +159,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       // tribger update of user schedule queries
       allUsers
         .map(_.content.map(_.name))
-        .map(_.map(username => TempoUserScheduleQueryTask(username, c.importStartDate, LocalDate.now())))
+        .map(_.map(username => TempoUserScheduleQueryTask(username, jiraConfig.importStartDate, LocalDate.now())))
         .map(_.foreach(task => self ! task))
 
       allUsers.onComplete {
@@ -169,12 +169,12 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           lastRead = Some(LocalDateTime.now())
           completedUsersImportOnce = true
 
-          log.info(s"Scheduling next users-import in ${c.importSyncInterval}")
-          context.system.scheduler.scheduleOnce(c.importSyncInterval, self, q)
+          log.info(s"Scheduling next users-import in ${jiraConfig.importSyncInterval}")
+          context.system.scheduler.scheduleOnce(jiraConfig.importSyncInterval, self, q)
 
         case Failure(ex) =>
-          log.error(ex, s"Users-import failed. Rescheduling next users-import in ${c.importWaitBetweenBatches}")
-          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
+          log.error(ex, s"Users-import failed. Rescheduling next users-import in ${jiraConfig.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
 
     case TempoUserScheduleQueryTask(username, startDate, endDate) =>
@@ -229,8 +229,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           lastRead = Some(LocalDateTime.now())
 
         case Failure(e) =>
-          log.error(e, s"JiraTempoTeamQueryTask task failed. Rescheduling in ${c.importWaitBetweenBatches}")
-          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
+          log.error(e, s"JiraTempoTeamQueryTask task failed. Rescheduling in ${jiraConfig.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
 
     case q@JiraTempoTeamMembersQueryTask((teamId :: remainingTeamIds)) =>
@@ -243,8 +243,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           dataWriter ! TeamMemberships(teamId, teamMembers)
 
           if (remainingTeamIds.isEmpty) {
-            log.info(s"Scheduling next Teams import in ${c.importSyncInterval}")
-            context.system.scheduler.scheduleOnce(c.importSyncInterval, self, JiraTempoTeamQueryTask)
+            log.info(s"Scheduling next Teams import in ${jiraConfig.importSyncInterval}")
+            context.system.scheduler.scheduleOnce(jiraConfig.importSyncInterval, self, JiraTempoTeamQueryTask)
             completedTeamsImportOnce = true
           } else {
             log.debug(s"Scheduling team query for next team in 3 second")
@@ -254,8 +254,8 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           lastRead = Some(LocalDateTime.now())
 
         case Failure(e) =>
-          log.error(e, s"Team members query for team $teamId failed. Rescheduling im ${c.importWaitBetweenBatches}")
-          context.system.scheduler.scheduleOnce(c.importWaitBetweenBatches, self, q)
+          log.error(e, s"Team members query for team $teamId failed. Rescheduling im ${jiraConfig.importWaitBetweenBatches}")
+          context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
 
     case StatusRequest(statusActor) =>
