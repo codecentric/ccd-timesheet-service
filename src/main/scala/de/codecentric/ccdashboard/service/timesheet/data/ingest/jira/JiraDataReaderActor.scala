@@ -1,6 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest.jira
 
-import java.time.temporal.TemporalAdjusters
+import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 import java.time.{LocalDate, LocalDateTime}
 
 import akka.actor.{ActorRef, Props}
@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import com.sun.prism.shape.ShapeRep.InvalidationType
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.{BaseDataReaderActor, DataAggregationActor, PerformUtilizationAggregation}
@@ -110,17 +111,21 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           enrichmentRequests.map(_.foreach(r => aggregationActor ! PerformUtilizationAggregation(r._1, r._2, r._3)))
 
           // Determine which task to query when
-          val toDate = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+          val lastDayOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+          val now = LocalDate.now()
+          val daysUntilEndOfYear = ChronoUnit.DAYS.between(now, lastDayOfYear)
+          val syncRangeDays = c.importSyncRangeDays + daysUntilEndOfYear
+
           val nextImport = if (syncing) {
-            if (fromDate.isBefore(toDate.minusDays(c.importSyncRangeDays))) {
-              TempoWorklogQueryTask(toDate, toDate.minusDays(c.importBatchSizeDays), syncing = true)
+            if (fromDate.isBefore(lastDayOfYear.minusDays(syncRangeDays))) {
+              TempoWorklogQueryTask(lastDayOfYear, lastDayOfYear.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = true)
             }
           } else {
             if (fromDate.isBefore(c.importStartDate)) {
               completedWorklogsImportOnce = true
-              TempoWorklogQueryTask(toDate, toDate.minusDays(c.importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(lastDayOfYear, lastDayOfYear.minusDays(c.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(c.importBatchSizeDays), syncing = false)
             }
