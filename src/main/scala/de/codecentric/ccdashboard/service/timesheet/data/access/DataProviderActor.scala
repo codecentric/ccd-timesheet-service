@@ -1,6 +1,7 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.LocalDate
+import java.time.{LocalDate, ZoneId}
+import java.time.temporal.{TemporalAccessor, TemporalAdjusters}
 import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
@@ -165,6 +166,18 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     }
     }
 
+  private def asUtilDate(localDate :LocalDate): Date = {
+    Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+  }
+
+  private def getVacationHours(reports :List[(Date, ReportEntry)]) = {
+    val today = asUtilDate(LocalDate.now())
+    val tomorrow = asUtilDate(LocalDate.now().plusDays(1))
+    val usedHours = reports.filter(_._1.before(tomorrow)).flatMap(_._2.vacationHours).sum
+    val plannedHours = reports.filter(_._1.after(today)).flatMap(_._2.vacationHours).sum
+    VacationHours(usedHours, plannedHours, 30 * 8 - usedHours - plannedHours)
+  }
+
   def receive: Receive = {
     case WorklogQuery(username, from, to) =>
       val requester = sender()
@@ -177,10 +190,23 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     case UserQuery(username) =>
       val requester = sender()
       log.debug("Received UserQuery")
-      ctx.run(userQuery.filter(_.name == lift(username)).take(1))
-        .map(users => UserQueryResult(users.headOption))
-        .pipeTo(requester)
+
+      val startOfYear = LocalDate.now().withDayOfYear(1);
+      val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+      val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(asUtilDate(startOfYear)), Option(asUtilDate(endOfYear)), username)
+
+      val resultFuture = for {
+        date <- fromDate
+        jiraReports <- ctx.run(userReport(username, date, toDate))
+        user <- ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(users => users.headOption)
+      } yield {
+        val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
+        UserQueryResult(user, getVacationHours(reports))
+      }
+
+      resultFuture.pipeTo(requester)
       userQueryCount = userQueryCount + 1
+
 
     case IssueQuery(id) =>
       val requester = sender()
@@ -269,9 +295,6 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
           val overallBillableHoursList = allReportAggregationsList.map(_.overallBillableHours)
           val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
           val keyGroupedReports = allReports.groupBy(_.key)
-          val usedVacationHoursList = allReportAggregationsList.map(_.usedVacationHours)
-          val plannedVacationHoursList = allReportAggregationsList.map(_.plannedVacationHours)
-          val freeVacationHoursList = allReportAggregationsList.map(_.freeVacationHours)
 
           val teamReportAggregation = keyGroupedReports.map {
             case (key, reportAggregations) =>
@@ -288,10 +311,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
           val overallHoursRequired = overallHoursRequiredList.sum
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = overallUtilizationList.sum / size
-          val usedVacationHours = usedVacationHoursList.sum
-          val plannedVacationHours = plannedVacationHoursList.sum
-          val freeVacationHours = freeVacationHoursList.sum
-          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), usedVacationHours, plannedVacationHours, freeVacationHours, teamReportAggregation.toList.sortBy(_.key))
+          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(fromDate, toDate, aggregationType.toString, result)
         }
 

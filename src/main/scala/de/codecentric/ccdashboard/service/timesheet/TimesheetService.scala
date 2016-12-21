@@ -130,7 +130,7 @@ object TimesheetService extends App {
         pathEndOrSingleSlash {
           val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
           onComplete(query) {
-            case Success(res) => complete(res.user)
+            case Success(res) => complete(res)
             case Failure(ex) => failWith(ex)
           }
         }

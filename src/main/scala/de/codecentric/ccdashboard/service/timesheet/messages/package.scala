@@ -36,10 +36,12 @@ package object messages {
     */
   case class UserQuery(username: String)
 
+
+  case class VacationHours(used: Double, planned: Double, free: Double)
   /**
     * Query for user response
     */
-  case class UserQueryResult(user: Option[User])
+  case class UserQueryResult(user: Option[User], vacationHours: VacationHours)
 
   /**
     * Query for an issue

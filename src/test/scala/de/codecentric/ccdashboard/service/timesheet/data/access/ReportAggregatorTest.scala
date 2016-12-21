@@ -14,20 +14,14 @@ import org.scalatest.FunSuite
 class ReportAggregatorTest extends FunSuite {
   val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
   val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
-  val tomorrow = Date.from(LocalDate.now().plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
 
   val reports = List(
     ("2015-07-01", ReportEntry(billableHours = Some(8.0))),
     ("2015-07-02", ReportEntry(billableHours = Some(4), adminHours = Some(4))),
     ("2016-08-01", ReportEntry(billableHours = Some(4), adminHours = Some(4))),
     ("2016-08-03", ReportEntry(adminHours = Some(4))),
-    ("2016-08-04", ReportEntry(vacationHours = Some(8))),
-    ("2016-09-01", ReportEntry(billableHours = Some(8))),
-    (dateFormat.format(tomorrow), ReportEntry(vacationHours = Some(4)))
-
+    ("2016-09-01", ReportEntry(billableHours = Some(8)))
   )
-
-
 
   val workSchedules = List(
     ("abc", "2015-07-01", 8.0),
@@ -76,16 +70,5 @@ class ReportAggregatorTest extends FunSuite {
   test("daysWithoutBookedHours should not contain today") {
     val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
     assert(!daysWithoutBookedHours.contains(dateFormat.format(today)))
-  }
-
-  test("vacationshours") {
-
-    val report = agg.aggregateMonthly()
-    val plannedVacationHours = report.plannedVacationHours
-    val usedVacationHours = report.usedVacationHours
-    val freeVacationHours = report.freeVacationHours
-    assert(usedVacationHours == 8)
-    assert(plannedVacationHours == 4)
-    assert(freeVacationHours == 28.5 * 8)
   }
 }

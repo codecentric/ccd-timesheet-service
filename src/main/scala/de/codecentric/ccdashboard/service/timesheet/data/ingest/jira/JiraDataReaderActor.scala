@@ -1,11 +1,12 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest.jira
 
+import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 import java.time.{LocalDate, LocalDateTime}
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.unmarshalling.Unmarshal
-import akka.pattern.{ask, pipe}
+import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
@@ -109,17 +110,20 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           enrichmentRequests.map(_.foreach(r => aggregationActor ! PerformUtilizationAggregation(r._1, r._2, r._3)))
 
           // Determine which task to query when
-          val now = LocalDate.now()
+          val lastDayOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+          val daysUntilEndOfYear = ChronoUnit.DAYS.between(LocalDate.now(), lastDayOfYear)
+          val syncRangeDays = jiraConfig.importSyncRangeDays + daysUntilEndOfYear
+
           val nextImport = if (syncing) {
-            if (fromDate.isBefore(now.minusDays(jiraConfig.importSyncRangeDays))) {
-              TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
+            if (fromDate.isBefore(lastDayOfYear.minusDays(syncRangeDays))) {
+              TempoWorklogQueryTask(lastDayOfYear, lastDayOfYear.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             }
           } else {
             if (fromDate.isBefore(jiraConfig.importStartDate)) {
               completedWorklogsImportOnce = true
-              TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
+              TempoWorklogQueryTask(lastDayOfYear, lastDayOfYear.minusDays(jiraConfig.importBatchSizeDays), syncing = true)
             } else {
               TempoWorklogQueryTask(fromDate, fromDate.minusDays(jiraConfig.importBatchSizeDays), syncing = false)
             }
