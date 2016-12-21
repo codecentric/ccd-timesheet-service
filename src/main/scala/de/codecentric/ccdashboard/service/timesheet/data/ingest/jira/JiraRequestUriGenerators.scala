@@ -11,7 +11,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.encoding._
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
 trait JiraRequestUriGenerators {
-  val c: JiraConfig
+  val jiraConfig: JiraConfig
 
   def scheme: String
 
@@ -22,16 +22,16 @@ trait JiraRequestUriGenerators {
       "dateFrom" -> fromDate.toString,
       "dateTo" -> toDate.toString,
       "format" -> "xml",
-      "tempoApiToken" -> c.tempoApiToken,
-      "projectKey" -> c.timesheetProjectKey)).toString
+      "tempoApiToken" -> jiraConfig.tempoApiToken,
+      "projectKey" -> jiraConfig.timesheetProjectKey)).toString
 
-    val path = Uri.Path(c.jiraTempoWorklogsServicePath)
+    val path = Uri.Path(jiraConfig.jiraTempoWorklogsServicePath)
 
     Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
   }
 
   def getJiraUsersRequestUri(mailSuffix: String) = {
-    val path = Uri.Path(c.jiraUsersServicePath)
+    val path = Uri.Path(jiraConfig.jiraUsersServicePath)
     val queryString = Query(Map(
       "username" -> mailSuffix,
       "maxResults" -> "100000")).toString
@@ -44,22 +44,22 @@ trait JiraRequestUriGenerators {
       case Left(key) => key
       case Right(id) => id.toString
     }
-    val path = Uri.Path(c.jiraIssueDetailsServicePath) / issueIdString
+    val path = Uri.Path(jiraConfig.jiraIssueDetailsServicePath) / issueIdString
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoTeamsUri = {
-    val path = Uri.Path(c.jiraTempoTeamServicePath)
+    val path = Uri.Path(jiraConfig.jiraTempoTeamServicePath)
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoTeamMembersUri(teamId: Int) = {
-    val path = Uri.Path(c.jiraTempoTeamMembersServicePath.format(teamId.toString))
+    val path = Uri.Path(jiraConfig.jiraTempoTeamMembersServicePath.format(teamId.toString))
     Uri(scheme = scheme, authority = authority, path = path)
   }
 
   def getJiraTempoUserScheduleUri(username: String, from: Date, to: Date) = {
-    val path = Uri.Path(c.jiraTempoUserScheduleServicePath)
+    val path = Uri.Path(jiraConfig.jiraTempoUserScheduleServicePath)
     val queryString = Query(Map(
       "user" -> username,
       "from" -> dateIsoFormatter(from),
@@ -70,7 +70,7 @@ trait JiraRequestUriGenerators {
   }
 
   def getTempoUserAvailabilityUri(username: String, from: Date, to: Date) = {
-    val path = Uri.Path(c.jiraTempoUserAvailabilityServicePath.format(username))
+    val path = Uri.Path(jiraConfig.jiraTempoUserAvailabilityServicePath.format(username))
     val queryString = Query(Map(
       "from" -> dateIsoFormatter(from),
       "to" -> dateIsoFormatter(to)
