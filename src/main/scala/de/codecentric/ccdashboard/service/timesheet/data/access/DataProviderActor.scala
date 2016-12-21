@@ -195,16 +195,16 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
       val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(asUtilDate(startOfYear)), Option(asUtilDate(endOfYear)), username)
 
-      val resultFut = for {
+      val resultFuture = for {
         date <- fromDate
-        utilizationReports <- ctx.run(userReport(username, date, toDate))
+        jiraReports <- ctx.run(userReport(username, date, toDate))
         user <- ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(users => users.headOption)
       } yield {
-        val reports = utilizationReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
+        val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
         UserQueryResult(user, getVacationHours(reports))
       }
 
-      resultFut.pipeTo(requester)
+      resultFuture.pipeTo(requester)
       userQueryCount = userQueryCount + 1
 
 
