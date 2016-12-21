@@ -198,10 +198,17 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val resultFuture = for {
         date <- fromDate
         jiraReports <- ctx.run(userReport(username, date, toDate))
-        user <- ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(users => users.headOption)
+        userOption <- ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(users => users.headOption)
       } yield {
         val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
-        UserQueryResult(user, getVacationHours(reports))
+
+        val user = userOption.getOrElse(null)
+        if (user != null) {
+          UserQueryResult(Option(user.userkey), Option(user.name), Option(user.emailAddress), Option(user.avatarUrl),
+            Option(user.displayName), Option(user.active), Option(getVacationHours(reports)))
+        } else {
+          UserQueryResult()
+        }
       }
 
       resultFuture.pipeTo(requester)

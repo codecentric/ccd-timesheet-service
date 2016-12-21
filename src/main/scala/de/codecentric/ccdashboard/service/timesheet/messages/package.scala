@@ -38,10 +38,17 @@ package object messages {
 
 
   case class VacationHours(used: Double, planned: Double, free: Double)
+
   /**
     * Query for user response
     */
-  case class UserQueryResult(user: Option[User], vacationHours: VacationHours)
+  case class UserQueryResult(userkey: Option[String] = None,
+                             name: Option[String] = None,
+                             emailAddress: Option[String] = None,
+                             avatarUrl: Option[String] = None,
+                             displayName: Option[String] = None,
+                             active: Option[Boolean] = None,
+                             vacationHours: Option[VacationHours] = None)
 
   /**
     * Query for an issue
