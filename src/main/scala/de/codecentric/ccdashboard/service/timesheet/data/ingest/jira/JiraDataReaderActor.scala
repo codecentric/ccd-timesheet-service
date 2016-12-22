@@ -160,10 +160,11 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         instanaUsers <- instanaUsersPromise.future
       } yield Users(ccUsers ++ instanaUsers)
 
+      val lastDayOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
       // tribger update of user schedule queries
       allUsers
         .map(_.content.map(_.name))
-        .map(_.map(username => TempoUserScheduleQueryTask(username, jiraConfig.importStartDate, LocalDate.now())))
+        .map(_.map(username => TempoUserScheduleQueryTask(username, jiraConfig.importStartDate, lastDayOfYear)))
         .map(_.foreach(task => self ! task))
 
       allUsers.onComplete {
