@@ -143,7 +143,12 @@ package object messages {
 
   case class EnrichWorklogQueryData(username: String, worklogs: List[Worklog], issues: List[Issue])
 
-  case class WorkScheduleQuery(username: String, until: Option[LocalDate])
+  case class WorkScheduleQuery(username: String)
+
+  case class WorkScheduleEntry(date: Date,
+                               usedVacationDays: Double,
+                               usedParentalLeaveDays: Double,
+                               targetHours: Double)
 
   case class WorkScheduleQueryResult(username: String,
                                      userStartOfYear: Date,
@@ -151,11 +156,10 @@ package object messages {
                                      userWorkDaysThisYear: Long,
                                      userWorkDaysAvailabilityRate: Double,
                                      vacationDaysThisYear: Long,
-                                     usedVacationDaysTillTodayInclusive: Double,
-                                     parentalLeaveDays: Double,
-                                     usedParentalLeaveDaysTillTodayInclusive: Double,
-                                     targetHours: Double,
-                                     targetHoursToday: Double,
-                                     burndownHoursPerWorkday: Double)
+                                     parentalLeaveDaysThisYear: Double,
+                                     targetHoursThisYear: Double,
+                                     burndownHoursPerWorkday: Double,
+                                     todaysWorkSchedule: WorkScheduleEntry,
+                                     monthlyAccumulation: List[WorkScheduleEntry])
 
 }

@@ -40,62 +40,44 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
     def ==(b: Date) = quote(infix"$a = $b".as[Boolean])
   }
 
-
-  final def TARGET_HOURS_BASE = 1440
-  final def VACATION_DAYS_PER_YEAR = 30
-
-
   def receive: Receive = {
-    case WorkScheduleQuery(username: String, until: Option[LocalDate]) =>
+    case WorkScheduleQuery(username: String) =>
       val requester = sender()
       log.debug("Received WorkScheduleQuery")
-      val startOfYear = LocalDate.now().withDayOfYear(1);
+      val startOfYear = LocalDate.now().withDayOfYear(1)
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
       val resultFuture = for {
          fullYearSchedules <- ctx.run(userSchedule(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
          fullYearReports <- ctx.run(userReport(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
-         employeeSinceOption <- teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
+         employeeSince <- teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
       } yield {
-         val userStartOfYear = employeeSinceOption.headOption.getOrElse(asUtilDate(startOfYear))
-         val userMonthsThisYear = ChronoUnit.MONTHS.between(asLocalDate(userStartOfYear), endOfYear) +
-           (if (asLocalDate(userStartOfYear).getDayOfMonth == 15) 0.5 else 1)
-         val vacationDaysThisYear = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
+         val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports, employeeSince.headOption)
 
-         val workDaysThisYear = fullYearSchedules.filter(_.requiredHours > 0).size
-         val userSchedules = fullYearSchedules.filter(s => s.workDate.after(userStartOfYear) ||
-                                                      s.workDate.equals(userStartOfYear))
-         val userWorkDaysThisYear = getWorkDaysFromUserSchedules(userSchedules)
-         val userWorkDaysAvailabilityRate = userWorkDaysThisYear / workDaysThisYear
+         val overallWorkSchedule = workScheduleService.getWorkScheduleUntil(asUtilDate(LocalDate.now().atTime(23, 59)))
 
-         val parentalLeaveDaysThisYear = fullYearReports.flatMap(_.parentalLeaveHours).sum / 8
-         val targetHours = (TARGET_HOURS_BASE * userWorkDaysAvailabilityRate) - (parentalLeaveDaysThisYear * 8 * 0.8)
+         val monthlyAccumulation = monthIterator(startOfYear, endOfYear)
+                                    .map(month => workScheduleService.getWorkScheduleUntil(asUtilDate(month))).toList
 
-         val endDate = asUtilDate(until.getOrElse(LocalDate.now).atTime(23, 59))
-         val workDaysTillTodayInclusive = getWorkDaysFromUserSchedules(userSchedules.filter(_.workDate.before(endDate)))
-
-         val burndownHoursPerWorkday = targetHours / (userWorkDaysThisYear - vacationDaysThisYear - parentalLeaveDaysThisYear)
-
-         val reportsTillTodayInclusive = fullYearReports.filter(_.day.before(endDate))
-         val usedVacationDaysTillTodayInclusive = reportsTillTodayInclusive.flatMap(_.vacationHours).sum / 8
-         val usedParentalLeaveDaysTillTodayInclusive = reportsTillTodayInclusive.flatMap(_.parentalLeaveHours).sum / 8
-         val targetHoursToday =
-           (workDaysTillTodayInclusive - usedVacationDaysTillTodayInclusive - usedParentalLeaveDaysTillTodayInclusive) * burndownHoursPerWorkday
 
          WorkScheduleQueryResult(username,
-           userStartOfYear,
-           workDaysThisYear,
-           userWorkDaysThisYear.round,
-           userWorkDaysAvailabilityRate,
-           vacationDaysThisYear,
-           usedVacationDaysTillTodayInclusive,
-           parentalLeaveDaysThisYear,
-           usedParentalLeaveDaysTillTodayInclusive,
-           targetHours,
-           targetHoursToday,
-           burndownHoursPerWorkday)
+           workScheduleService.userStartOfYear,
+           workScheduleService.workDaysThisYear,
+           workScheduleService.userWorkDaysThisYear.round,
+           workScheduleService.userWorkDaysAvailabilityRate,
+           workScheduleService.vacationDaysThisYear,
+           workScheduleService.parentalLeaveDaysThisYear,
+           workScheduleService.targetHoursThisYear,
+           workScheduleService.burndownHoursPerWorkday,
+           overallWorkSchedule,
+           monthlyAccumulation)
       }
       resultFuture.pipeTo(requester)
   }
+
+  private def monthIterator(start: LocalDate, end: LocalDate) = {
+    Iterator.iterate(start)(_ plusMonths 1) takeWhile (_ isBefore end)
+  }
+
 
   private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
