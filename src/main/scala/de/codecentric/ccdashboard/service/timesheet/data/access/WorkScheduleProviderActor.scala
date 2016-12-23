@@ -57,7 +57,7 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
          val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(asUtilDate(getEndDate(startOfYear.getYear)))
 
          val monthlyAccumulation = monthIterator(startOfYear, endOfYear)
-                                    .map(month => workScheduleService.getWorkScheduleUntil(asUtilDate(month))).toList
+           .map(month => workScheduleService.getWorkScheduleUntil(asUtilDate(month.`with`(TemporalAdjusters.lastDayOfMonth())))).toList
 
 
          WorkScheduleQueryResult(username,
