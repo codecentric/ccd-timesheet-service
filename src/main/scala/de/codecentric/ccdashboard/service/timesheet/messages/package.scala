@@ -145,8 +145,17 @@ package object messages {
 
   case class WorkScheduleQuery(username: String)
 
-  case class WorkScheduleQueryResult(username: String, overallWorkDaysThisYear: Long, parentalLeaveDays: Double,
-                                     usedVacationDaysTillToday: Double, scaledWorkDaysThisYear: Long,
-                                     targetHours: Double, targetHoursToday: Double)
+  case class WorkScheduleQueryResult(username: String,
+                                     userStartOfYear: Date,
+                                     workDaysThisYear: Long,
+                                     userWorkDaysThisYear: Long,
+                                     userWorkDaysAvailabilityRate: Double,
+                                     vacationDaysThisYear: Long,
+                                     usedVacationDaysTillTodayInclusive: Double,
+                                     parentalLeaveDays: Double,
+                                     usedParentalLeaveDaysTillTodayInclusive: Double,
+                                     targetHours: Double,
+                                     targetHoursToday: Double,
+                                     burndownHoursPerWorkday: Double)
 
 }
