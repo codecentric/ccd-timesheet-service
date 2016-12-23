@@ -46,7 +46,7 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
 
 
   def receive: Receive = {
-    case WorkScheduleQuery(username: String) =>
+    case WorkScheduleQuery(username: String, until: Option[LocalDate]) =>
       val requester = sender()
       log.debug("Received WorkScheduleQuery")
       val startOfYear = LocalDate.now().withDayOfYear(1);
@@ -70,12 +70,12 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
          val parentalLeaveDaysThisYear = fullYearReports.flatMap(_.parentalLeaveHours).sum / 8
          val targetHours = (TARGET_HOURS_BASE * userWorkDaysAvailabilityRate) - (parentalLeaveDaysThisYear * 8 * 0.8)
 
-         val endOfToday = asUtilDate(LocalDate.now().atTime(23, 59))
-         val workDaysTillTodayInclusive = getWorkDaysFromUserSchedules(userSchedules.filter(_.workDate.before(endOfToday)))
+         val endDate = asUtilDate(until.getOrElse(LocalDate.now).atTime(23, 59))
+         val workDaysTillTodayInclusive = getWorkDaysFromUserSchedules(userSchedules.filter(_.workDate.before(endDate)))
 
          val burndownHoursPerWorkday = targetHours / (userWorkDaysThisYear - vacationDaysThisYear - parentalLeaveDaysThisYear)
 
-         val reportsTillTodayInclusive = fullYearReports.filter(_.day.before(endOfToday))
+         val reportsTillTodayInclusive = fullYearReports.filter(_.day.before(endDate))
          val usedVacationDaysTillTodayInclusive = reportsTillTodayInclusive.flatMap(_.vacationHours).sum / 8
          val usedParentalLeaveDaysTillTodayInclusive = reportsTillTodayInclusive.flatMap(_.parentalLeaveHours).sum / 8
          val targetHoursToday =

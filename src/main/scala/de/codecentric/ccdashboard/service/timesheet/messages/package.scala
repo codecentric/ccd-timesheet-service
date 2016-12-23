@@ -143,7 +143,7 @@ package object messages {
 
   case class EnrichWorklogQueryData(username: String, worklogs: List[Worklog], issues: List[Issue])
 
-  case class WorkScheduleQuery(username: String)
+  case class WorkScheduleQuery(username: String, until: Option[LocalDate])
 
   case class WorkScheduleQueryResult(username: String,
                                      userStartOfYear: Date,

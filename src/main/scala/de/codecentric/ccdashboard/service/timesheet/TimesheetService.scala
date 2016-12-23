@@ -170,10 +170,12 @@ object TimesheetService extends App {
         } ~
         path("workschedule") {
           get {
-            val query = (workScheduleProvider ? WorkScheduleQuery(username)).mapTo[WorkScheduleQueryResult]
-            onComplete(query) {
-              case Success(res) => complete(res)
-              case Failure(ex) => failWith(ex)
+            parameters('until.as[LocalDate].?) { (until) =>
+              val query = (workScheduleProvider ? WorkScheduleQuery(username, until)).mapTo[WorkScheduleQueryResult]
+              onComplete(query) {
+                case Success(res) => complete(res)
+                case Failure(ex) => failWith(ex)
+              }
             }
           }
         }
