@@ -41,19 +41,20 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
   }
 
   def receive: Receive = {
-    case WorkScheduleQuery(username: String) =>
+    case WorkScheduleQuery(username: String, year: Option[Int]) =>
       val requester = sender()
       log.debug("Received WorkScheduleQuery")
-      val startOfYear = LocalDate.now().withDayOfYear(1)
-      val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+      val startOfYear = LocalDate.ofYearDay(year.getOrElse(LocalDate.now().getYear), 1)
+      val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
       val resultFuture = for {
          fullYearSchedules <- ctx.run(userSchedule(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
          fullYearReports <- ctx.run(userReport(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
          employeeSince <- teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
       } yield {
-         val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports, employeeSince.headOption)
+         val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports,
+           employeeSince.headOption, startOfYear.getYear)
 
-         val overallWorkSchedule = workScheduleService.getWorkScheduleUntil(asUtilDate(LocalDate.now().atTime(23, 59)))
+         val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(asUtilDate(getEndDate(startOfYear.getYear)))
 
          val monthlyAccumulation = monthIterator(startOfYear, endOfYear)
                                     .map(month => workScheduleService.getWorkScheduleUntil(asUtilDate(month))).toList
@@ -68,10 +69,18 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
            workScheduleService.parentalLeaveDaysThisYear,
            workScheduleService.targetHoursThisYear,
            workScheduleService.burndownHoursPerWorkday,
-           overallWorkSchedule,
+           totalWorkSchedule,
            monthlyAccumulation)
       }
       resultFuture.pipeTo(requester)
+  }
+
+  private def getEndDate(year: Int) : LocalDateTime = {
+    if (year == LocalDate.now().getYear) {
+      LocalDate.now().atTime(23, 59)
+    } else {
+      LocalDate.ofYearDay(year, 31).atTime(23, 59)
+    }
   }
 
   private def monthIterator(start: LocalDate, end: LocalDate) = {

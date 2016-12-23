@@ -169,13 +169,15 @@ object TimesheetService extends App {
           }
         } ~
         path("workschedule") {
-          get {
-            val query = (workScheduleProvider ? WorkScheduleQuery(username)).mapTo[WorkScheduleQueryResult]
-            onComplete(query) {
-              case Success(res) => complete(res)
-              case Failure(ex) => failWith(ex)
+          parameters('year.as[Int].?) { (year) =>
+            get {
+              val query = (workScheduleProvider ? WorkScheduleQuery(username, year)).mapTo[WorkScheduleQueryResult]
+              onComplete(query) {
+                case Success(res) => complete(res)
+                case Failure(ex) => failWith(ex)
+              }
             }
-            }
+          }
         }
     } ~
       pathPrefix("issue" / issueIdMatcher) { id =>

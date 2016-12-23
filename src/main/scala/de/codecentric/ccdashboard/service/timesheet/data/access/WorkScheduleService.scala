@@ -10,13 +10,14 @@ import de.codecentric.ccdashboard.service.timesheet.messages.{WorkScheduleEntry}
 /**
   * Created by tbinias on 23.12.16.
   */
-class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports: List[UserUtilization], employeeSince: Option[Date]) {
+class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports: List[UserUtilization],
+                          employeeSince: Option[Date], year: Int) {
 
   final private val TARGET_HOURS_BASE = 1440
   final private val VACATION_DAYS_PER_YEAR = 30
 
-  final private val startOfYear = LocalDate.now().withDayOfYear(1)
-  final private val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
+  final private val startOfYear = LocalDate.ofYearDay(year, 1)
+  final private val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
 
   final val userStartOfYear = employeeSince.getOrElse(asUtilDate(startOfYear))
   private val userMonthsThisYear = ChronoUnit.MONTHS.between(asLocalDate(userStartOfYear), endOfYear) +
