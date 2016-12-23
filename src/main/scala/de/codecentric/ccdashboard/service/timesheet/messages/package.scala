@@ -143,4 +143,23 @@ package object messages {
 
   case class EnrichWorklogQueryData(username: String, worklogs: List[Worklog], issues: List[Issue])
 
+  case class WorkScheduleQuery(username: String, year: Option[Int])
+
+  case class WorkScheduleEntry(date: Date,
+                               usedVacationDays: Double,
+                               usedParentalLeaveDays: Double,
+                               targetHours: Double)
+
+  case class WorkScheduleQueryResult(username: String,
+                                     userStartOfYear: Date,
+                                     workDaysThisYear: Long,
+                                     userWorkDaysThisYear: Long,
+                                     userWorkDaysAvailabilityRate: Double,
+                                     vacationDaysThisYear: Long,
+                                     parentalLeaveDaysThisYear: Double,
+                                     targetHoursThisYear: Double,
+                                     burndownHoursPerWorkday: Double,
+                                     totalWorkSchedule: WorkScheduleEntry,
+                                     monthlyAccumulation: List[WorkScheduleEntry])
+
 }

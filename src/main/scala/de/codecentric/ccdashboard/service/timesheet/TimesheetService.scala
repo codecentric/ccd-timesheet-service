@@ -77,7 +77,8 @@ object TimesheetService extends App {
     // create and start our main actors and components
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")
     val dataProvider = system.actorOf(Props(new DataProviderActor(conf, cassandraContextConfig)), "data-provider")
-    val bindingFuture = Http().bindAndHandle(route(dataProvider), interface, port)
+    var workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
+    val bindingFuture = Http().bindAndHandle(route(dataProvider,workScheduleProvider), interface, port)
 
     system.scheduler.schedule(5.seconds, 30.seconds, new Runnable {
       override def run(): Unit = {
@@ -105,7 +106,7 @@ object TimesheetService extends App {
   /**
     * Defines the service endpoints
     */
-  def route(dataProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer) = {
+  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer) = {
     import CirceSupport._
     import Directives._
     import io.circe.generic.auto._
@@ -160,6 +161,17 @@ object TimesheetService extends App {
               val aggregationType = aggregationTypeTry.get
 
               val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
+              onComplete(query) {
+                case Success(res) => complete(res)
+                case Failure(ex) => failWith(ex)
+              }
+            }
+          }
+        } ~
+        path("workschedule") {
+          parameters('year.as[Int].?) { (year) =>
+            get {
+              val query = (workScheduleProvider ? WorkScheduleQuery(username, year)).mapTo[WorkScheduleQueryResult]
               onComplete(query) {
                 case Success(res) => complete(res)
                 case Failure(ex) => failWith(ex)
