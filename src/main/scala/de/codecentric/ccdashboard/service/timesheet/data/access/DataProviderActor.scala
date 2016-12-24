@@ -14,6 +14,7 @@ import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.messages._
+import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
@@ -166,13 +167,9 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     }
     }
 
-  private def asUtilDate(localDate :LocalDate): Date = {
-    Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
-  }
-
-  private def getVacationHours(reports :List[(Date, ReportEntry)]) = {
-    val today = asUtilDate(LocalDate.now())
-    val tomorrow = asUtilDate(LocalDate.now().plusDays(1))
+  private def getVacationHours(reports: List[(Date, ReportEntry)]) = {
+    val today = LocalDate.now().asUtilDate
+    val tomorrow = LocalDate.now().plusDays(1).asUtilDate
     val usedHours = reports.filter(_._1.before(tomorrow)).flatMap(_._2.vacationHours).sum
     val plannedHours = reports.filter(_._1.after(today)).flatMap(_._2.vacationHours).sum
     VacationHours(usedHours, plannedHours, 30 * 8 - usedHours - plannedHours)
@@ -193,7 +190,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
 
       val startOfYear = LocalDate.now().withDayOfYear(1);
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
-      val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(asUtilDate(startOfYear)), Option(asUtilDate(endOfYear)), username)
+      val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate), Option(endOfYear.asUtilDate), username)
 
       val resultFuture = for {
         date <- fromDate

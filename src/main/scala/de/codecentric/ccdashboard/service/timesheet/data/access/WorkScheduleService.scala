@@ -7,6 +7,7 @@ import java.util.Date
 import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, UserUtilization}
 import de.codecentric.ccdashboard.service.timesheet.messages.{WorkScheduleEntry}
 
+import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 /**
   * Created by tbinias on 23.12.16.
   */
@@ -19,9 +20,9 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   final private val startOfYear = LocalDate.ofYearDay(year, 1)
   final private val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
 
-  final val userStartOfYear = employeeSince.getOrElse(asUtilDate(startOfYear))
-  private val userMonthsThisYear = ChronoUnit.MONTHS.between(asLocalDate(userStartOfYear), endOfYear) +
-    (if (asLocalDate(userStartOfYear).getDayOfMonth == 15) 0.5 else 1)
+  final val userStartOfYear = employeeSince.getOrElse(startOfYear.asUtilDate)
+  private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartOfYear.asLocalDate, endOfYear) +
+    (if (userStartOfYear.asLocalDate.getDayOfMonth == 15) 0.5 else 1)
   final val vacationDaysThisYear = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
 
   final val workDaysThisYear = fullYearSchedules.filter(_.requiredHours > 0).size
@@ -52,18 +53,6 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
 
   private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
-  }
-
-  private def asUtilDate(localDate :LocalDate): Date = {
-    Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
-  }
-
-  private def asUtilDate(localDateTime :LocalDateTime): Date = {
-    Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant())
-  }
-
-  private def asLocalDate(date: Date): LocalDate = {
-    date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
   }
 
 }

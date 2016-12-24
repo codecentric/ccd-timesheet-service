@@ -10,6 +10,7 @@ import com.datastax.driver.core.{Row, TypeTokens}
 import com.google.common.reflect.TypeToken
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Team, UserSchedule, UserUtilization}
 import de.codecentric.ccdashboard.service.timesheet.messages._
+import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
@@ -47,17 +48,17 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
       val startOfYear = LocalDate.ofYearDay(year.getOrElse(LocalDate.now().getYear), 1)
       val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
       val resultFuture = for {
-         fullYearSchedules <- ctx.run(userSchedule(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
-         fullYearReports <- ctx.run(userReport(username, asUtilDate(startOfYear), asUtilDate(endOfYear)))
+         fullYearSchedules <- ctx.run(userSchedule(username, startOfYear.asUtilDate, endOfYear.asUtilDate))
+         fullYearReports <- ctx.run(userReport(username, startOfYear.asUtilDate, endOfYear.asUtilDate))
          employeeSince <- teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
       } yield {
          val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports,
            employeeSince.headOption, startOfYear.getYear)
 
-         val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(asUtilDate(getEndDate(startOfYear.getYear)))
+         val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(getEndDate(startOfYear.getYear).asUtilDate)
 
          val monthlyAccumulation = monthIterator(startOfYear, endOfYear)
-           .map(month => workScheduleService.getWorkScheduleUntil(asUtilDate(month.`with`(TemporalAdjusters.lastDayOfMonth())))).toList
+           .map(month => workScheduleService.getWorkScheduleUntil(month.`with`(TemporalAdjusters.lastDayOfMonth()).asUtilDate)).toList
 
 
          WorkScheduleQueryResult(username,
@@ -86,7 +87,6 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
   private def monthIterator(start: LocalDate, end: LocalDate) = {
     Iterator.iterate(start)(_ plusMonths 1) takeWhile (_ isBefore end)
   }
-
 
   private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
@@ -119,18 +119,6 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
     ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
       extractor = teamExtractor)
       .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
-  }
-
-  private def asUtilDate(localDate :LocalDate): Date = {
-    Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
-  }
-
-  private def asUtilDate(localDateTime :LocalDateTime): Date = {
-    Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant())
-  }
-
-  private def asLocalDate(date: Date): LocalDate = {
-    date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
   }
 
 }
