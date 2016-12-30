@@ -66,6 +66,11 @@ package object messages {
   case class TeamQuery(teamId: Option[Int] = None)
 
   /**
+    * Query for all teams or one specific team
+    */
+  case class TeamMemberQuery(teamId: Option[Int] = None)
+
+  /**
     * Query in which team a user is and since when
     *
     * @param username
@@ -78,6 +83,12 @@ package object messages {
     * Query for all teams or one specific response
     */
   case class TeamQueryResponse(teams: Option[Teams])
+
+  trait TeamMembershipQueryResponse
+
+  case class SingleTeamMembershipQueryResponse(team: Option[TeamMemberships]) extends TeamMembershipQueryResponse
+
+  case class MultipleTeamMembershipQueryResponse(teams: Option[List[TeamMemberships]]) extends TeamMembershipQueryResponse
 
   case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 

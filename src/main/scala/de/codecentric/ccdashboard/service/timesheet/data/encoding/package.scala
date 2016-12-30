@@ -67,7 +67,7 @@ package object encoding {
   )
 
   implicit val encodeDate: Encoder[Date] = Encoder.instance[Date](date =>
-    Json.fromString(dateIsoFormatter(date))
+    if(date == null) Json.Null else Json.fromString(dateIsoFormatter(date))
   )
 
   implicit val decodeDate: Decoder[Option[Date]] = Decoder.instance(c =>

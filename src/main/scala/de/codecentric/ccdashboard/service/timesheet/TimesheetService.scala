@@ -232,6 +232,24 @@ object TimesheetService extends App {
             }
           }
       } ~
+      // This endpoint is meant to replace the team endpoint.
+      pathPrefix("team2") {
+        path(IntNumber.?) { id =>
+          get {
+            pathEndOrSingleSlash {
+              val query = (dataProvider ? TeamMemberQuery(id)).mapTo[TeamMembershipQueryResponse]
+              onComplete(query) {
+                case Success(res) =>
+                  res match {
+                    case MultipleTeamMembershipQueryResponse(teams) => complete(teams)
+                    case SingleTeamMembershipQueryResponse(team) => complete(team)
+                  }
+                case Failure(ex) => failWith(ex)
+              }
+            }
+          }
+        }
+      } ~
       pathPrefix("status") {
         get {
           val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]

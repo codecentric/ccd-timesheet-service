@@ -96,12 +96,19 @@ class DataWriterActor(conf: Config, cassandraContextConfig: CassandraContextConf
       // Cassandra doesn't allow null values in collections so if there is no
       // Date available, use the 'initial' Date (Jan. 1 1970)
       val membersMap = members.map {
-        case TeamMember(name, date) => name -> date.getOrElse(new Date(0))
+        case TeamMember(name, dateFrom, dateTo, availability) => name -> dateFrom.getOrElse(new Date(0))
       }.toMap.asJava
 
       ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
         st.bind(membersMap, teamId.asInstanceOf[java.lang.Integer])
       )
+
+      members.foreach(member =>
+        ctx.executeAction("INSERT INTO team_member (teamId, memberName, dateFrom, dateTo, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
+          st.bind(teamId.asInstanceOf[java.lang.Integer], member.name, member.dateFrom.orNull, member.dateTo.orNull, member.availability.getOrElse(100).asInstanceOf[java.lang.Integer])
+        )
+      )
+
       lastWrite = Some(LocalDateTime.now())
 
     case UserSchedules(username, userSchedules) =>

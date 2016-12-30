@@ -1,7 +1,7 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.{LocalDate, ZoneId}
-import java.time.temporal.{TemporalAccessor, TemporalAdjusters}
+import java.time.LocalDate
+import java.time.temporal.TemporalAdjusters
 import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
@@ -18,6 +18,7 @@ import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
@@ -47,6 +48,16 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     val map = row.getMap(2, stringToken, dateToken).asScala.toMap.mapValues(d => if (d.getTime == 0) None else Some(d))
 
     Team(id, name, Some(map))
+  }
+  }
+
+  private val teamMemberExtractor: Row => TeamMember = { row => {
+    val memberName = row.getString("memberName")
+    val dateFrom = row.getTimestamp("dateFrom")
+    val dateTo = row.getTimestamp("dateTo")
+    val availability = row.getInt("availability")
+
+    TeamMember(memberName, Some(dateFrom), Some(dateTo), Some(availability))
   }
   }
 
@@ -223,6 +234,79 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
         case Failure(ex) => requester ! IssueQueryResult(None)
       }
       issueQueryCount = issueQueryCount + 1
+
+    case TeamMemberQuery(teamId) =>
+      val requester = sender()
+      log.debug("Received TeamMemberQuery")
+      teamId match {
+        case Some(id) => {
+          val result = ctx.executeQuerySingle[Team](s"SELECT id, name, members FROM team WHERE id = $id",
+            extractor = teamExtractor
+          )
+
+          result.onComplete {
+            case Success(team) => {
+              val memberNames = team.members.getOrElse(Map()).keys
+              val teamMembers = mutable.MutableList[TeamMember]()
+              for (memberName <- memberNames) {
+                val result = ctx.executeQuerySingle[TeamMember](s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $id AND memberName = '$memberName'",
+                  extractor = teamMemberExtractor)
+
+                result.onComplete {
+                  case Success(teamMember) => {
+                    teamMembers += teamMember
+                    if (teamMembers.size == memberNames.size) {
+                      requester ! SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId.getOrElse(0), teamMembers.toList)))
+                    }
+                  }
+                  case Failure(ex) => requester ! SingleTeamMembershipQueryResponse(None)
+                }
+              }
+            }
+            case Failure(ex) => requester ! SingleTeamMembershipQueryResponse(None)
+          }
+        }
+
+        case None => {
+          val result = ctx.executeQuery[Team](s"SELECT id, name, members FROM team",
+            extractor = teamExtractor
+          )
+
+          result.onComplete {
+            case Success(teams) => {
+              val teamMemberships = mutable.MutableList[TeamMemberships]()
+              val remainingTeamIds = mutable.ListBuffer.empty ++= teams.map(team => team.id)
+              for (team <- teams) {
+                val memberNames = team.members.getOrElse(Map()).keys
+                val teamMembers = mutable.MutableList[TeamMember]()
+                val teamId = team.id
+                remainingTeamIds -= teamId
+                for (memberName <- memberNames) {
+                  val result = ctx.executeQuerySingle[TeamMember](s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $teamId AND memberName = '$memberName'",
+                    extractor = teamMemberExtractor)
+
+                  result.onComplete {
+                    case Success(teamMember) => {
+                      teamMembers += teamMember
+                      if (teamMembers.size == memberNames.size) {
+                        teamMemberships += TeamMemberships(teamId, teamMembers.toList)
+
+                        if (remainingTeamIds.isEmpty) {
+                          requester ! MultipleTeamMembershipQueryResponse(Some(teamMemberships.toList))
+                        }
+                      }
+                    }
+                    case Failure(ex) => requester ! MultipleTeamMembershipQueryResponse(None)
+                  }
+                }
+              }
+            }
+            case Failure(ex) => requester ! MultipleTeamMembershipQueryResponse(None)
+          }
+        }
+      }
+
+      teamQueryCount = teamQueryCount + 1
 
     case TeamQuery(teamId) =>
       val requester = sender()
