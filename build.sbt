@@ -15,14 +15,15 @@ resolvers ++= Seq(
 
 // Project dependencies
 libraryDependencies ++= {
-  val akkaV = "2.4.10"
+  val akkaV = "2.4.16"
+  val akkaHttpV = "10.0.1"
   val circeV = "0.5.1"
   val quillV = "0.10.0"
 
   Seq(
     //  groupID %% artifactID % revision
     // Actors, rest server and client
-    "com.typesafe.akka" %% "akka-http-experimental" % akkaV,
+    "com.typesafe.akka" %% "akka-http" % akkaHttpV,
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     // Prevent warning
     "org.scala-lang.modules" %% "scala-xml" % "1.0.4",
