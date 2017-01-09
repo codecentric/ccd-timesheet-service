@@ -17,5 +17,8 @@ Start at application.conf and jiraclient.conf
 After configuring jiraclient.conf with the available information, execute JiraOAuthTokenRequest and follow the instructions
 
 ## Start ##
-execute Boot.scala
-Note: more info to come
+
+1. Create docker image from ./DockerCassandra
+2. Create new docker container with `docker run --expose=9042 -p 9042:9042 --name cassandra <$imageName>` (Make sure container name is "cassandra")
+3. Run sbt with `-Dtimesheet-service.database-config-key=cassandra.localconfig`
+4. Service is now ready at `http://0.0.0.0:8080/`
