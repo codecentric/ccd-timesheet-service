@@ -139,7 +139,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     } yield {
       employeeSinceDateList match {
         case Nil => fromDate
-        case list => List(list.min, fromDate).max
+        case list => List(list.min, fromDate).min
       }
     }
     (dateToUse, toDate)
@@ -188,7 +188,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val requester = sender()
       log.debug("Received UserQuery")
 
-      val startOfYear = LocalDate.now().withDayOfYear(1);
+      val startOfYear = LocalDate.now().withDayOfYear(1)
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
       val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate), Option(endOfYear.asUtilDate), username)
 
