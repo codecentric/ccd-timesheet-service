@@ -199,13 +199,11 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       } yield {
         val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
 
-        val user = userOption.getOrElse(null)
-        if (user != null) {
-          UserQueryResult(Option(user.userkey), Option(user.name), Option(user.emailAddress), Option(user.avatarUrl),
-            Option(user.displayName), Option(user.active), Option(getVacationHours(reports)))
-        } else {
-          UserQueryResult()
-        }
+        userOption.map(u =>
+          UserQueryResult(Option(u.userkey), Option(u.name), Option(u.emailAddress), Option(u.avatarUrl),
+            Option(u.displayName), Option(u.active), Option(getVacationHours(reports)))
+        ).getOrElse(UserQueryResult())
+
       }
 
       resultFuture.pipeTo(requester)
