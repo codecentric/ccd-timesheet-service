@@ -14,9 +14,7 @@ import io.getquill.{CassandraContextConfig, CassandraSyncContext, SnakeCase}
 /**
   * Actor that receives Worklogs from a DataIngestActor and stores inserts them into the database
   */
-class DataWriterActor(conf: Config, cassandraContextConfig: CassandraContextConfig) extends Actor with ActorLogging {
-
-  val dbWriter: DatabaseWriter = CassandraWriter
+class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging {
 
   var lastWrite: Option[LocalDateTime] = None
 
