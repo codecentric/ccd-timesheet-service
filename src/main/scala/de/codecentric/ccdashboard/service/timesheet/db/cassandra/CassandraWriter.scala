@@ -9,6 +9,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseWriter
 import de.codecentric.ccdashboard.service.timesheet.util.CassandraContextConfigWithSocketOptions
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
 
@@ -41,7 +42,7 @@ object CassandraWriter extends DatabaseWriter {
     })
   }
 
-  def insertTeams(ts: List[Team]): Future[Unit] = {
+  def insertTeams(ts: List[Team]): Future[Unit] = Future {
     ts.foreach(team =>
       ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
         st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
