@@ -8,7 +8,7 @@ import de.codecentric.ccdashboard.service.timesheet.messages.{TeamMembershipQuer
 import scala.concurrent.Future
 
 trait DatabaseReader {
-  def getTeamById(id: String): Future[Team]
+  def getTeamById(id: Int): Future[Team]
 
   def getTeams(): Future[List[Team]]
 
