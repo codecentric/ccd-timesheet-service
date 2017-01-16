@@ -31,6 +31,7 @@ libraryDependencies ++= Vector(
   Library.quillCassandra,
 
   Library.akkaHttpTestkit % "test",
+  Library.scalaMock       % "test",
   Library.scalaTest       % "test"
 )
 
