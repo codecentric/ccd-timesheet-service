@@ -3,22 +3,24 @@ import java.util.{Date, Map}
 
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 
+import scala.concurrent.Future
+
 
 trait DatabaseWriter {
 
-  def insertWorklogs(logs: List[Worklog]): Unit
-  def insertUsers(users: List[User]): Unit
+  def insertWorklogs(logs: List[Worklog]): Future[Unit]
+  def insertUsers(users: List[User]): Future[Unit]
 
-  def insertIssue(issue: Issue): Unit
+  def insertIssue(issue: Issue): Future[Unit]
 
-  def insertTeams(teamss: List[Team]): Unit
+  def insertTeams(teams: List[Team]): Future[Unit]
 
-  def insertUtilization(util: UserUtilization): Unit
+  def insertUtilization(util: UserUtilization): Future[Unit]
 
-  def insertUserSchedules(schedules: List[UserSchedule]): Unit
+  def insertUserSchedules(schedules: List[UserSchedule]): Future[Unit]
 
-  def deleteUsers(): Unit
-  def deleteTeams(): Unit
+  def deleteUsers(): Future[Unit]
+  def deleteTeams(): Future[Unit]
 
-  def updateTeams(members: Map[String, Date], teamId: Int): Unit
+  def updateTeams(members: Map[String, Date], teamId: Int): Future[Unit]
 }
