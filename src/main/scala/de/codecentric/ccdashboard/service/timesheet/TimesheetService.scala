@@ -18,6 +18,7 @@ import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
+import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.codecentric.ccdashboard.service.timesheet.util._
@@ -76,7 +77,10 @@ object TimesheetService extends App {
 
     // create and start our main actors and components
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")
-    val dataProvider = system.actorOf(Props(new DataProviderActor(conf, cassandraContextConfig)), "data-provider")
+    val dataProvider = system.actorOf(Props(new DataProviderActor(
+      LocalDate.parse(conf.getString("timesheet-service.data-import.start-date")),
+      CassandraReader
+    )), "data-provider")
     var workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider,workScheduleProvider), interface, port)
 
