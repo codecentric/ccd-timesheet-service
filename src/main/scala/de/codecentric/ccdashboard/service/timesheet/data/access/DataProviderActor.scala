@@ -28,7 +28,7 @@ import scala.concurrent.duration._
 /**
   * Created by bjacobs on 18.07.16.
   */
-class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends Actor with ActorLogging {
+class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) extends Actor with ActorLogging {
 
   val importStartDate: LocalDate = startDate
 
@@ -43,11 +43,20 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
   import context.dispatcher
 
 
+  private val teamMemberExtractor: Row => TeamMember = (row) => {
+    val memberName = row.getString("memberName")
+    val dateFrom = row.getTimestamp("dateFrom")
+    val dateTo = row.getTimestamp("dateTo")
+    val availability = row.getInt("availability")
+
+    TeamMember(memberName, Some(dateFrom), Some(dateTo), Some(availability))
+  }
+
   def getEmployeeSpecificDateRange(from: Option[Date], to: Option[Date], username: String) = {
     val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
     val toDate = to.getOrElse(new Date())
 
-    val employeeSinceDateFuture = reader
+    val employeeSinceDateFuture = dbReader
       .getTeamMembership(username).map({
       _.flatMap({
         _.dateFrom
@@ -99,7 +108,7 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
     case WorklogQuery(username, from, to) =>
       val requester = sender()
       log.debug("Received WorklogQuery")
-      reader.getWorklog(username, from, to)
+      dbReader.getWorklog(username, from, to)
         .pipeTo(requester)
       worklogQueryCount = worklogQueryCount + 1
 
@@ -113,8 +122,8 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
 
       val resultFuture = for {
         date <- fromDate
-        jiraReports <- reader.getUtilizationReport(username, date, toDate)
-        userOption <- reader.getUserByName(username)
+        jiraReports <- dbReader.getUtilizationReport(username, date, toDate)
+        userOption <- dbReader.getUserByName(username)
       } yield {
         val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
 
@@ -132,7 +141,7 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
     case IssueQuery(id) =>
       val requester = sender()
       log.debug("Received IssueQuery")
-      val result = reader.getIssueById(id)
+      val result = dbReader.getIssueById(id)
 
       result.onComplete {
         case Success(issue) => requester ! IssueQueryResult(Some(issue))
@@ -145,12 +154,12 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
       log.debug("Received TeamQuery")
       teamId match {
         case Some(id) =>
-          reader.getTeamById(id)
+          dbReader.getTeamById(id)
             .map(t => TeamQueryResponse(Some(Teams(List(t)))))
             .pipeTo(requester)
 
         case None =>
-          reader.getTeams()
+          dbReader.getTeams()
             .map(t => TeamQueryResponse(Some(Teams(t))))
             .pipeTo(requester)
       }
@@ -161,7 +170,7 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
       val requester = sender()
       log.debug("Received TeamMembershipQuery")
 
-      reader.getTeamMembership(username).pipeTo(requester)
+      dbReader.getTeamMembership(username).pipeTo(requester)
 
       teamMembershipQueryCount = teamMembershipQueryCount + 1
 
@@ -172,8 +181,8 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
 
       val resultFut = for {
         date <- fromDate
-        utilizationReports <- reader.getUtilizationReport(username, date, toDate)
-        workSchedule <- reader.getUserSchedule(username, date, toDate)
+        utilizationReports <- dbReader.getUtilizationReport(username, date, toDate)
+        workSchedule <- dbReader.getUserSchedule(username, date, toDate)
       } yield {
         val reports = utilizationReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
         val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
@@ -190,7 +199,7 @@ class DataProviderActor(startDate: => LocalDate, reader: DatabaseReader) extends
       val toDate = to.getOrElse(new Date())
 
       // get all users from the team
-      val teamFut = reader.getTeamById(teamId)
+      val teamFut = dbReader.getTeamById(teamId)
 
       teamFut.map(team => {
         val usernames = team.members.map(_.keys).getOrElse(Nil)

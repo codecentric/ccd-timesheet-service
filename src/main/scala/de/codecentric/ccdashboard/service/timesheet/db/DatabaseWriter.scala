@@ -23,4 +23,5 @@ trait DatabaseWriter {
   def deleteTeams(): Future[Unit]
 
   def updateTeams(members: Map[String, Date], teamId: Int): Future[Unit]
+  def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit]
 }

@@ -65,6 +65,8 @@ package object messages {
     */
   case class TeamQuery(teamId: Option[Int] = None)
 
+  case class TeamMemberQuery(teamId: Option[Int] = None)
+
   /**
     * Query in which team a user is and since when
     *
@@ -82,6 +84,11 @@ package object messages {
   case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 
   case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+
+  sealed trait TeamMembershipQueryResponse
+  case class SingleTeamMembershipQueryResponse(team: Option[TeamMemberships]) extends TeamMembershipQueryResponse
+  case class MultipleTeamMembershipQueryResponse(teams: Option[List[TeamMemberships]]) extends TeamMembershipQueryResponse
+
 
   object ReportQueryAggregationType extends Enumeration {
     val DAILY = Value("daily")

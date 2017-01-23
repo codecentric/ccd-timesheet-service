@@ -236,6 +236,15 @@ object TimesheetService extends App {
             }
           }
       } ~
+      pathPrefix("team2") {
+         path(IntNumber.?) { id =>
+             get {
+               pathEndOrSingleSlash {
+                 complete("Not implemented yet")
+               }
+             }
+           }
+       } ~
       pathPrefix("status") {
         get {
           val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]

@@ -8,7 +8,7 @@ object Version {
   final val Circe         = "0.5.1" // FIXME latest is 0.6.1
   final val Csup          = "0.0.5-SNAPSHOT" // FIXME don't depend on snapshots
   final val Logback       = "1.1.7"
-  final val Quill         = "0.10.0"
+  final val Quill         = "1.0.1"
   final val Scala         = "2.12.0"
   final val ScalaLogging  = "3.4.0"
   final val ScalaTest     = "3.0.1"
