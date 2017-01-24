@@ -25,7 +25,7 @@ object CassandraWriter extends DatabaseWriter {
 
   lazy val metaData: Metadata = cassandraContextConfig.cluster.getMetadata()
 
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig) with Encoders with Decoders
+  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig) with Encoders
 
   import ctx._
 
@@ -57,6 +57,16 @@ object CassandraWriter extends DatabaseWriter {
     Future.reduce(futures)((_,_) => ())
   }
 
+  def insertTeam2s(ts: List[Team2]): Future[Unit] = {
+    val futures = ts.map(team =>
+      ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
+        st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
+      )
+    )
+
+    Future.reduce(futures)((_,_) => ())
+  }
+
   def insertUtilization(u: UserUtilization): Future[Unit] = ctx.run(quote {
     query[UserUtilization].insert(lift(u))
   })
@@ -75,13 +85,17 @@ object CassandraWriter extends DatabaseWriter {
     query[Team].delete
   })
 
+  def deleteTeam2s(): Future[Unit] = ctx.run(quote {
+    query[Team2].delete
+  })
+
   def updateTeams(ms: java.util.Map[String, Date], teamId: Int): Future[Unit] = {
     ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
       st.bind(ms, teamId.asInstanceOf[java.lang.Integer])
     )
   }
 
-  def updateTeamWithMembers(ms: Map[String, TeamMemberInfo], teamId: Int): Future[Unit] = ctx.run(quote {
+  def updateTeam2s(ms: Map[String, TeamMemberInfo], teamId: Int): Future[Unit] = ctx.run(quote {
     query[Team2].filter(_.id == lift(teamId)).update(_.members -> lift(ms))
   })
 
@@ -122,11 +136,4 @@ trait Encoders {
   lazy val tupleType = CassandraWriter.metaData.newTupleType(DataType.date(), DataType.date(), DataType.cint())
 }
 
-trait Decoders {
-  this: CassandraSessionContext[_] =>
 
-  import scala.collection.JavaConverters._
-
-  implicit def setDecoder[T](implicit t: ClassTag[T]): Decoder[Map[String, T]] =
-    decoder((index, row) => row.getMap(index, classOf[String], t.runtimeClass.asInstanceOf[Class[T]]).asScala.toMap)
-}

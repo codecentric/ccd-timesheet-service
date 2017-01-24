@@ -11,6 +11,7 @@ trait DatabaseReader {
   def getTeamById(id: Int): Future[Team]
 
   def getTeams(): Future[List[Team]]
+  def getTeam2s(): Future[List[Team2]]
 
   def getIssueById(id: String): Future[Issue]
   def getUserSchedules(username: String, from: Date, to: Date): Future[List[UserSchedule]]

@@ -2,7 +2,7 @@ package de.codecentric.ccdashboard.service.timesheet.db.cassandra
 
 import java.util.Date
 
-import com.datastax.driver.core.{Row, SocketOptions, TypeTokens}
+import com.datastax.driver.core.{Row, SocketOptions, TupleValue, TypeTokens}
 import com.google.common.reflect.TypeToken
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Team, User}
@@ -14,14 +14,16 @@ import scala.collection.JavaConverters._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
+import io.getquill.context.cassandra.CassandraSessionContext
 
+import scala.collection.immutable.Map
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object CassandraReader extends DatabaseReader {
 
   lazy val cassandraContextConfig: CassandraContextConfig = createCassandraContext()
 
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
+  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig) with Decoders
 
   import ctx._
 
@@ -71,6 +73,10 @@ object CassandraReader extends DatabaseReader {
     ctx.executeQuery(s"SELECT id, name, members FROM team",
       extractor = teamExtractor
     )
+  }
+
+  def getTeam2s(): Future[List[Team2]] = {
+    ctx.run(query[Team2])
   }
 
   def getIssueById(id: String): Future[Issue] = {
@@ -141,4 +147,23 @@ object CassandraReader extends DatabaseReader {
     val socketOptions = new SocketOptions().setConnectTimeoutMillis(60000).setReadTimeoutMillis(60000)
     new CassandraContextConfigWithSocketOptions(dbConfig, socketOptions)
   }
+
+}
+
+trait Decoders {
+  this: CassandraSessionContext[_] =>
+
+  import scala.collection.JavaConverters._
+
+  implicit def setDecoder: Decoder[Map[String, TeamMemberInfo]] = decoder((index, row) => {
+    val cassandraMap = row.getMap(index, classOf[String], classOf[TupleValue])
+    cassandraMap.asScala.mapValues(t => {
+      val from = t.get(0, classOf[Date])
+      val to = t.get(1, classOf[Date])
+      val availability = t.get(2, classOf[Double])
+
+      TeamMemberInfo(Option(from), Option(to), availability = availability.toInt)
+    }).toMap
+  })
+
 }
