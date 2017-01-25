@@ -2,4 +2,4 @@ FROM hseeberger/scala-sbt
 
 MAINTAINER Björn Jacobs <bjoern.jacobs@codecentric.de>
 
-CMD sbt clean universal:packageBin
+CMD sbt clean test universal:packageBin

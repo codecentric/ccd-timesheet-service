@@ -12,8 +12,8 @@ import org.scalatest.FunSuite
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
 class ReportAggregatorTest extends FunSuite {
-  val dateFormat = new SimpleDateFormat("yyyy-MM-dd")
-  val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+  val dateFormat: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+  val today: Date = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant)
 
   val reports = List(
     ("2015-07-01", ReportEntry(billableHours = Some(8.0))),
@@ -33,8 +33,9 @@ class ReportAggregatorTest extends FunSuite {
     ("abc", dateFormat.format(today), 8.0)
   )
 
-  val mappedWorkSchedules = workSchedules.map({ case (username, dateString, hours) => UserSchedule(username, dateFormat.parse(dateString), hours) })
-  val mappedReports = reports.map(x => dateFormat.parse(x._1) -> x._2)
+  val mappedWorkSchedules: List[UserSchedule] = workSchedules.map(
+    { case (username, dateString, hours) => UserSchedule(username, dateFormat.parse(dateString), hours) })
+  val mappedReports: List[(Date, ReportEntry)] = reports.map(x => dateFormat.parse(x._1) -> x._2)
 
   val agg = ReportAggregator(mappedReports, mappedWorkSchedules)
 
@@ -58,7 +59,7 @@ class ReportAggregatorTest extends FunSuite {
   test("testAggregateYearly") {
     val m = agg.aggregateYearly().reports.map(x => x.key -> x).toMap
     assert((m("2015").utilization - 0.5).abs < 0.01)
-    assert((m("2016").utilization - 0.375).abs < 0.01)
+    assert((m("2016").utilization - 0.5).abs < 0.01)
   }
 
   test("daysWithoutBookedHours") {
@@ -69,6 +70,6 @@ class ReportAggregatorTest extends FunSuite {
 
   test("daysWithoutBookedHours should not contain today") {
     val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
-    assert(!daysWithoutBookedHours.contains(dateFormat.format(today)))
+    assert(!daysWithoutBookedHours.contains(today))
   }
 }

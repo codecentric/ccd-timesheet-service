@@ -12,11 +12,11 @@ import com.github.scribejava.core.services.{RSASha1SignatureService, SignatureSe
   * Created by bjacobs on 21.07.16.
   */
 class JiraApi(val privateKey: String, val authorizeUrl: String, val requestTokenResource: String, val accessTokenResource: String) extends DefaultApi10a {
-  def getAccessTokenEndpoint: String = accessTokenResource
+  override def getAccessTokenEndpoint: String = accessTokenResource
 
-  def getAuthorizationUrl(requestToken: OAuth1RequestToken): String = String.format(authorizeUrl, requestToken.getToken)
+  override def getAuthorizationUrl(requestToken: OAuth1RequestToken): String = String.format(authorizeUrl, requestToken.getToken)
 
-  def getRequestTokenEndpoint: String = requestTokenResource
+  override def getRequestTokenEndpoint: String = requestTokenResource
 
   override def getSignatureService: SignatureService = new RSASha1SignatureService(getPrivateKey)
 
