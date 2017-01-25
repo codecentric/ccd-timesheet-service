@@ -17,7 +17,6 @@ services:
       - ccdashboardplatform_prodnetwork
     links:
       - cassandra:cassandra
-    mem_limit: "1536m"
   cassandra:
     build: ./DockerCassandra
     mem_limit: "3G"
@@ -27,7 +26,6 @@ services:
       - ccdashboardplatform_prodnetwork
     volumes:
       - data:/var/lib/cassandra
-     mem_limit: "1024m"
 
 volumes:
   data:
