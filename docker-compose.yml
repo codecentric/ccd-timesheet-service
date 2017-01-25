@@ -10,7 +10,7 @@ services:
     image: ccd-timesheet-service
     ports:
       - "10005:8080"
-    mem_limit: "1536m"
+    mem_limit: "3072m"
     expose:
       - "8080"
     networks:
