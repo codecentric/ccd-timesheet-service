@@ -19,7 +19,7 @@ services:
       - cassandra:cassandra
   cassandra:
     build: ./DockerCassandra
-    mem_limit: "1024m"
+    mem_limit: "2048m"
     expose:
       - "9042"
     networks:
