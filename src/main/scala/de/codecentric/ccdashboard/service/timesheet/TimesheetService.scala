@@ -27,6 +27,7 @@ import de.heikoseeberger.akkahttpcirce.CirceSupport
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Success, Try}
+import ch.megard.akka.http.cors.CorsDirectives._
 
 /**
   * Created by bjacobs on 12.07.16.
@@ -102,7 +103,7 @@ object TimesheetService extends App {
   /**
     * Defines the service endpoints
     */
-  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer): Route = {
+  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer): Route = cors() {
     import CirceSupport._
     import Directives._
     import io.circe.generic.auto._
