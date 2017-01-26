@@ -8,12 +8,12 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
-import com.datastax.driver.core.{Cluster, SocketOptions}
+import com.datastax.driver.core.SocketOptions
 import com.github.bjoernjacobs.csup.CsUp
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
@@ -23,12 +23,10 @@ import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.codecentric.ccdashboard.service.timesheet.util._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
-import io.getquill.CassandraContextConfig
-import io.getquill.context.cassandra.cluster.ClusterBuilder
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 /**
   * Created by bjacobs on 12.07.16.
@@ -64,9 +62,6 @@ object TimesheetService extends App {
 
   /**
     * Main start-up function that creates the ActorSystem and Actors
-    *
-    * @param ec
-    * @param materializer
     */
   def startUp(implicit ec: ExecutionContext, materializer: Materializer): Future[ServerBinding] = {
     val dbConfigKey = conf.getString("timesheet-service.database-config-key")
@@ -107,7 +102,7 @@ object TimesheetService extends App {
   /**
     * Defines the service endpoints
     */
-  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer) = {
+  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer): Route = {
     import CirceSupport._
     import Directives._
     import io.circe.generic.auto._
@@ -145,15 +140,10 @@ object TimesheetService extends App {
         path("report") {
           get {
             parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
-              val aggregationTypeTry = aggregationTypeString
+              val aggregationType = aggregationTypeString
                 .map(s => Try(ReportQueryAggregationType.withName(s)))
                 .getOrElse(Success(ReportQueryAggregationType.MONTHLY))
-
-              if (aggregationTypeTry.isFailure) {
-                failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
-              }
-
-              val aggregationType = aggregationTypeTry.get
+                .get
 
               val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
               complete(query)
