@@ -273,7 +273,12 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
 
     case EmployeesQuery() =>
       val requester = sender()
-      val query = ctx.run(userQuery.map(_.name).distinct).map(EmployeesQueryResponse)
+
+      val query = ctx.executeQuery[String]("SELECT membername from team_member",
+        extractor = row => row.getString("membername"))
+        .map(_.distinct.sorted)
+        .map(EmployeesQueryResponse)
+
       query.pipeTo(requester)
 
     case UserReportQuery(username, from, to, aggregationType) =>
