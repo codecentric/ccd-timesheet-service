@@ -8,7 +8,7 @@ import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
 import akka.pattern.ask
 import akka.util.Timeout
-import com.datastax.driver.core.{Row, TypeTokens}
+import com.datastax.driver.core.Row
 import com.google.common.reflect.TypeToken
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
@@ -18,22 +18,17 @@ import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.concurrent.duration._
 
-
-/**
-  * Created by bjacobs on 18.07.16.
-  */
 class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextConfig) extends Actor with ActorLogging {
   lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
 
-  val importStartDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
+  val importStartDate: LocalDate = LocalDate.parse(conf.getString("timesheet-service.data-import.start-date"))
 
   private val stringToken = TypeToken.of(classOf[String])
-  private val stringMapToken = TypeTokens.mapOf(stringToken, stringToken)
+  //private val stringMapToken = TypeTokens.mapOf(stringToken, stringToken)
   private val dateToken = TypeToken.of(classOf[java.util.Date])
 
   private var userQueryCount = 0L
@@ -103,12 +98,16 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     }
   }
 
-  val userQuery = quote {
+  val userQuery: ctx.Quoted[ctx.EntityQuery[User]] = quote {
     query[User]
   }
 
-  val teamQuery = quote {
+  val teamQuery: ctx.Quoted[ctx.EntityQuery[Team]] = quote {
     query[Team]
+  }
+
+  val teamMemberQuery: ctx.Quoted[ctx.EntityQuery[TeamMember]] = quote {
+    query[TeamMember]
   }
 
   def userReport(username: String, from: Date, to: Date): Quoted[Query[UserUtilization]] = {
@@ -125,21 +124,22 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       .filter(_.workDate <= lift(to))
   }
 
-  def userScheduleQuery(username: String, from: Date, to: Date) = {
+  def userScheduleQuery(username: String, from: Date, to: Date): Future[List[UserSchedule]] = {
     ctx.run(userSchedule(username, from, to))
   }
 
-  def teamMembershipQuery(username: String) = {
+  def teamMembershipQuery(username: String): Future[List[TeamMembershipQueryResult]] = {
     ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
       extractor = teamExtractor)
-      .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
+      .map(teams => teams.map(
+        team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
   }
 
   def issueQuery(id: String): Quoted[Query[Issue]] = {
     query[Issue].filter(_.id == lift(id))
   }
 
-  def getEmployeeSpecificDateRange(from: Option[Date], to: Option[Date], username: String) = {
+  def getEmployeeSpecificDateRange(from: Option[Date], to: Option[Date], username: String): (Future[Date], Date) = {
     val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
     val toDate = to.getOrElse(new Date())
 
@@ -156,7 +156,8 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     (dateToUse, toDate)
   }
 
-  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)], workSchedule: List[UserSchedule], aggregationType: ReportQueryAggregationType.Value) = {
+  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)], workSchedule: List[UserSchedule],
+                                    aggregationType: ReportQueryAggregationType.Value): ReportAggregationResult = {
     val aggregator = ReportAggregator(reports, workSchedule)
     // Aggregate Reports
     aggregationType match {
@@ -172,7 +173,9 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
   }
 
 
-  def generateReportQueryResponse(fromDate: Date, toDate: Date, aggregationResultFuture: Future[ReportAggregationResult], aggregationType: ReportQueryAggregationType.Value) =
+  def generateReportQueryResponse(fromDate: Date, toDate: Date,
+                                  aggregationResultFuture: Future[ReportAggregationResult],
+                                  aggregationType: ReportQueryAggregationType.Value): Future[ReportQueryResponse] =
     aggregationResultFuture.map { aggregationResult => {
       ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
     }
@@ -184,6 +187,20 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     val usedHours = reports.filter(_._1.before(tomorrow)).flatMap(_._2.vacationHours).sum
     val plannedHours = reports.filter(_._1.after(today)).flatMap(_._2.vacationHours).sum
     VacationHours(usedHours, plannedHours, 30 * 8 - usedHours - plannedHours)
+  }
+
+  def getTeamMembers(teamId: Int): Future[SingleTeamMembershipQueryResponse] = {
+    val teamMembersFuture = ctx.executeQuery[TeamMember](
+      s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $teamId",
+      extractor = teamMemberExtractor)
+
+    teamMembersFuture.map(teamMembers => {
+      SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, teamMembers)))
+    })
+  }
+
+  def getTeamIds: Future[List[Int]] = {
+    ctx.executeQuery[Int]("SELECT DISTINCT teamId FROM team_member", extractor = row => row.getInt("teamId"))
   }
 
   def receive: Receive = {
@@ -199,18 +216,22 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val requester = sender()
       log.debug("Received UserQuery")
 
-      val startOfYear = LocalDate.now().withDayOfYear(1);
+      val startOfYear = LocalDate.now().withDayOfYear(1)
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
-      val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate), Option(endOfYear.asUtilDate), username)
+      val (fromDate, toDate) = getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate),
+        Option(endOfYear.asUtilDate), username)
 
       val resultFuture = for {
         date <- fromDate
         jiraReports <- ctx.run(userReport(username, date, toDate))
         userOption <- ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(users => users.headOption)
       } yield {
-        val reports = jiraReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
+        val reports = jiraReports.map(
+          u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
+            u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
+            u.otherHours)))
 
-        val user = userOption.getOrElse(null)
+        val user = userOption.orNull
         if (user != null) {
           UserQueryResult(Option(user.userkey), Option(user.name), Option(user.emailAddress), Option(user.avatarUrl),
             Option(user.displayName), Option(user.active), Option(getVacationHours(reports)))
@@ -226,114 +247,34 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     case IssueQuery(id) =>
       val requester = sender()
       log.debug("Received IssueQuery")
-      val result = ctx.executeQuerySingle[Issue](s"SELECT id, issue_key, issue_url, summary, components, custom_fields, issue_type FROM issue WHERE id = '$id'",
+      val result = ctx.executeQuerySingle[Issue](
+        s"SELECT id, issue_key, issue_url, summary, components, custom_fields, issue_type FROM issue WHERE id = '$id'",
         extractor = issueExtractor)
 
       result.onComplete {
         case Success(issue) => requester ! IssueQueryResult(Some(issue))
-        case Failure(ex) => requester ! IssueQueryResult(None)
+        case Failure(_) => requester ! IssueQueryResult(None)
       }
       issueQueryCount = issueQueryCount + 1
 
-    case TeamMemberQuery(teamId) =>
+    case SingleTeamMembershipQuery(teamId) =>
       val requester = sender()
-      log.debug("Received TeamMemberQuery")
-      teamId match {
-        case Some(id) => {
-          val result = ctx.executeQuerySingle[Team](s"SELECT id, name, members FROM team WHERE id = $id",
-            extractor = teamExtractor
-          )
-
-          result.onComplete {
-            case Success(team) => {
-              val memberNames = team.members.getOrElse(Map()).keys
-              val teamMembers = mutable.MutableList[TeamMember]()
-              for (memberName <- memberNames) {
-                val result = ctx.executeQuerySingle[TeamMember](s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $id AND memberName = '$memberName'",
-                  extractor = teamMemberExtractor)
-
-                result.onComplete {
-                  case Success(teamMember) => {
-                    teamMembers += teamMember
-                    if (teamMembers.size == memberNames.size) {
-                      requester ! SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId.getOrElse(0), teamMembers.toList)))
-                    }
-                  }
-                  case Failure(ex) => requester ! SingleTeamMembershipQueryResponse(None)
-                }
-              }
-            }
-            case Failure(ex) => requester ! SingleTeamMembershipQueryResponse(None)
-          }
-        }
-
-        case None => {
-          val result = ctx.executeQuery[Team](s"SELECT id, name, members FROM team",
-            extractor = teamExtractor
-          )
-
-          result.onComplete {
-            case Success(teams) => {
-              val teamMemberships = mutable.MutableList[TeamMemberships]()
-              val remainingTeamIds = mutable.ListBuffer.empty ++= teams.map(team => team.id)
-              for (team <- teams) {
-                val memberNames = team.members.getOrElse(Map()).keys
-                val teamMembers = mutable.MutableList[TeamMember]()
-                val teamId = team.id
-                remainingTeamIds -= teamId
-                for (memberName <- memberNames) {
-                  val result = ctx.executeQuerySingle[TeamMember](s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $teamId AND memberName = '$memberName'",
-                    extractor = teamMemberExtractor)
-
-                  result.onComplete {
-                    case Success(teamMember) => {
-                      teamMembers += teamMember
-                      if (teamMembers.size == memberNames.size) {
-                        teamMemberships += TeamMemberships(teamId, teamMembers.toList)
-
-                        if (remainingTeamIds.isEmpty) {
-                          requester ! MultipleTeamMembershipQueryResponse(Some(teamMemberships.toList))
-                        }
-                      }
-                    }
-                    case Failure(ex) => requester ! MultipleTeamMembershipQueryResponse(None)
-                  }
-                }
-              }
-            }
-            case Failure(ex) => requester ! MultipleTeamMembershipQueryResponse(None)
-          }
-        }
-      }
-
-      teamQueryCount = teamQueryCount + 1
-
-    case TeamQuery(teamId) =>
-      val requester = sender()
-      log.debug("Received TeamQuery")
-      teamId match {
-        case Some(id) =>
-          ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE id = $id",
-            extractor = teamExtractor
-          ).map(t => TeamQueryResponse(Some(Teams(List(t)))))
-            .pipeTo(requester)
-
-        case None =>
-          ctx.executeQuery(s"SELECT id, name, members FROM team",
-            extractor = teamExtractor
-          ).map(t => TeamQueryResponse(Some(Teams(t))))
-            .pipeTo(requester)
-      }
-
-      teamQueryCount = teamQueryCount + 1
-
-    case TeamMembershipQuery(username) =>
-      val requester = sender()
-      log.debug("Received TeamMembershipQuery")
-
-      teamMembershipQuery(username).pipeTo(requester)
-
       teamMembershipQueryCount = teamMembershipQueryCount + 1
+      getTeamMembers(teamId).pipeTo(requester)
+
+    case AllTeamMembershipQuery() =>
+      val requester = sender()
+      teamMembershipQueryCount = teamMembershipQueryCount + 1
+
+      getTeamIds.flatMap(teamIds => {
+        Future.sequence(teamIds.map(getTeamMembers))
+      }).map(AllTeamMembershipQueryResponse)
+        .pipeTo(requester)
+
+    case EmployeesQuery() =>
+      val requester = sender()
+      val query = ctx.run(userQuery.map(_.name).distinct).map(EmployeesQueryResponse)
+      query.pipeTo(requester)
 
     case UserReportQuery(username, from, to, aggregationType) =>
       val requester = sender()
@@ -345,7 +286,10 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
         utilizationReports <- ctx.run(userReport(username, date, toDate))
         workSchedule <- ctx.run(userSchedule(username, date, toDate))
       } yield {
-        val reports = utilizationReports.map(u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours, u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours, u.otherHours)))
+        val reports = utilizationReports.map(
+          u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
+            u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
+            u.otherHours)))
         val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
 
         ReportQueryResponse(date, toDate, aggregationType.toString, aggregationResult)
@@ -378,10 +322,10 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
         } yield {
           val allReportAggregationsList = allReportAggregations.toList
           val allReports = allReportAggregationsList.flatMap(_.reports)
-          val size = allReportAggregationsList.size
+          //val size = allReportAggregationsList.size
           val overallHoursRequiredList = allReportAggregationsList.map(_.overallHoursRequired)
           val overallBillableHoursList = allReportAggregationsList.map(_.overallBillableHours)
-          val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
+          //val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
           val keyGroupedReports = allReports.groupBy(_.key)
 
           val teamReportAggregation = keyGroupedReports.map {
@@ -399,7 +343,8 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
           val overallHoursRequired = overallHoursRequiredList.sum
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = teamReportAggregation.map(_.utilization).sum / teamReportAggregation.size
-          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, List[Date](), teamReportAggregation.toList.sortBy(_.key))
+          val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization,
+            List[Date](), teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(fromDate, toDate, aggregationType.toString, result)
         }
 

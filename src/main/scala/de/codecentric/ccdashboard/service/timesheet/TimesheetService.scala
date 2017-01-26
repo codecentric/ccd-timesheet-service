@@ -7,6 +7,7 @@ import java.util.Date
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Directives
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
@@ -67,7 +68,7 @@ object TimesheetService extends App {
     * @param ec
     * @param materializer
     */
-  def startUp(implicit ec: ExecutionContext, materializer: Materializer) = {
+  def startUp(implicit ec: ExecutionContext, materializer: Materializer): Future[ServerBinding] = {
     val dbConfigKey = conf.getString("timesheet-service.database-config-key")
     val dbConfig = conf.getConfig(dbConfigKey)
 
@@ -77,7 +78,7 @@ object TimesheetService extends App {
     // create and start our main actors and components
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")
     val dataProvider = system.actorOf(Props(new DataProviderActor(conf, cassandraContextConfig)), "data-provider")
-    var workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
+    val workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider,workScheduleProvider), interface, port)
 
     system.scheduler.schedule(5.seconds, 30.seconds, new Runnable {
@@ -130,20 +131,14 @@ object TimesheetService extends App {
       get {
         pathEndOrSingleSlash {
           val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
-          onComplete(query) {
-            case Success(res) => complete(res)
-            case Failure(ex) => failWith(ex)
-          }
+          complete(query)
         }
       } ~
         path("worklog") {
           get {
             parameters('from.as[Date].?, 'to.as[Date].?) { (from, to) =>
               val query = (dataProvider ? WorklogQuery(username, from, to)).mapTo[WorklogQueryResult]
-              onComplete(query) {
-                case Success(res) => complete(res.worklogs)
-                case Failure(ex) => failWith(ex)
-              }
+              complete(query)
             }
           }
         } ~
@@ -152,7 +147,7 @@ object TimesheetService extends App {
             parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
               val aggregationTypeTry = aggregationTypeString
                 .map(s => Try(ReportQueryAggregationType.withName(s)))
-                .getOrElse(Success(ReportQueryAggregationType.DAILY))
+                .getOrElse(Success(ReportQueryAggregationType.MONTHLY))
 
               if (aggregationTypeTry.isFailure) {
                 failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
@@ -161,10 +156,7 @@ object TimesheetService extends App {
               val aggregationType = aggregationTypeTry.get
 
               val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
-              onComplete(query) {
-                case Success(res) => complete(res)
-                case Failure(ex) => failWith(ex)
-              }
+              complete(query)
             }
           }
         } ~
@@ -172,10 +164,7 @@ object TimesheetService extends App {
           parameters('year.as[Int].?) { (year) =>
             get {
               val query = (workScheduleProvider ? WorkScheduleQuery(username, year)).mapTo[WorkScheduleQueryResult]
-              onComplete(query) {
-                case Success(res) => complete(res)
-                case Failure(ex) => failWith(ex)
-              }
+              complete(query)
             }
           }
         }
@@ -184,28 +173,20 @@ object TimesheetService extends App {
         get {
           pathEndOrSingleSlash {
             val query = (dataProvider ? IssueQuery(id)).mapTo[IssueQueryResult]
-            onComplete(query) {
-              case Success(res) => complete(res.issue)
-              case Failure(ex) => failWith(ex)
-            }
+            complete(query)
           }
         }
       } ~
+      // This endpoint is meant to replace the team endpoint.
       pathPrefix("team") {
         path(IntNumber.?) { id =>
           get {
             pathEndOrSingleSlash {
-              val query = (dataProvider ? TeamQuery(id)).mapTo[TeamQueryResponse]
-              onComplete(query) {
-                case Success(res) =>
-                  res.teams match {
-                    case Some(teams) =>
-                      val content = teams.content
-                      if (content.size == 1) complete(content.head)
-                      else complete(content)
-                    case None => complete()
-                  }
-                case Failure(ex) => failWith(ex)
+              id match {
+                case Some(teamId) =>
+                  complete((dataProvider ? SingleTeamMembershipQuery(teamId)).mapTo[SingleTeamMembershipQueryResponse].map(_.team))
+                case None =>
+                  complete((dataProvider ? AllTeamMembershipQuery()).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
               }
             }
           }
@@ -213,40 +194,22 @@ object TimesheetService extends App {
           path(IntNumber / "report") { id =>
             get {
               parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
-                val aggregationTypeTry = aggregationTypeString
+                val aggregationType = aggregationTypeString
                   .map(s => Try(ReportQueryAggregationType.withName(s)))
-                  .getOrElse(Success(ReportQueryAggregationType.DAILY))
-
-                if (aggregationTypeTry.isFailure) {
-                  failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
-                }
-
-                val aggregationType = aggregationTypeTry.get
+                  .getOrElse(Success(ReportQueryAggregationType.MONTHLY))
+                  .get
 
                 val query = (dataProvider ? TeamReportQuery(id, from, to, aggregationType)).mapTo[ReportQueryResponse]
-                onComplete(query) {
-                  case Success(res) => complete(res)
-                  case Failure(ex) => failWith(ex)
-                }
+                complete(query)
               }
             }
           }
       } ~
-      // This endpoint is meant to replace the team endpoint.
-      pathPrefix("team2") {
-        path(IntNumber.?) { id =>
-          get {
-            pathEndOrSingleSlash {
-              val query = (dataProvider ? TeamMemberQuery(id)).mapTo[TeamMembershipQueryResponse]
-              onComplete(query) {
-                case Success(res) =>
-                  res match {
-                    case MultipleTeamMembershipQueryResponse(teams) => complete(teams)
-                    case SingleTeamMembershipQueryResponse(team) => complete(team)
-                  }
-                case Failure(ex) => failWith(ex)
-              }
-            }
+      pathPrefix("employees") {
+        get {
+          pathEndOrSingleSlash {
+            val query = (dataProvider ? EmployeesQuery()).mapTo[EmployeesQueryResponse].map(_.employees)
+            complete(query)
           }
         }
       } ~
@@ -255,16 +218,10 @@ object TimesheetService extends App {
           val query = (statusActor ? StatusQuery).mapTo[StatusQueryResponse]
 
           pathEndOrSingleSlash {
-            onComplete(query) {
-              case Success(res) => complete(res.statusMap)
-              case Failure(ex) => failWith(ex)
-            }
+            complete(query.map(_.statusMap))
           } ~
             pathSuffix("q") {
-              onComplete(query) {
-                case Success(res) => complete(res.importCompleted)
-                case Failure(ex) => failWith(ex)
-              }
+              complete(query.map(_.importCompleted))
           }
         }
       }
