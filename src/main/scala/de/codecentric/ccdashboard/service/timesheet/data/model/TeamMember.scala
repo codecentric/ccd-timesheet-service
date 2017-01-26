@@ -5,7 +5,7 @@ import java.util.Date
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
-case class TeamMember(name: String, dateFrom: Option[Date]) extends TeamMemberable {
+case class TeamMember(name: String, dateFrom: Option[Date], dateTo: Option[Date], availability: Option[Int]) extends TeamMemberable {
   override def toTeamMember: TeamMember = this
 }
 

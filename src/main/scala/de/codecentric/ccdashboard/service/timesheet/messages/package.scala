@@ -36,7 +36,6 @@ package object messages {
     */
   case class UserQuery(username: String)
 
-
   case class VacationHours(used: Double, planned: Double, free: Double)
 
   /**
@@ -61,27 +60,35 @@ package object messages {
   case class IssueQueryResult(issue: Option[Issue])
 
   /**
-    * Query for all teams or one specific team
+    * Query for one specific team
     */
-  case class TeamQuery(teamId: Option[Int] = None)
+  case class SingleTeamMembershipQuery(teamId: Int)
+
+  /**
+    * Query for all teams
+    */
+  case class AllTeamMembershipQuery()
 
   /**
     * Query in which team a user is and since when
-    *
-    * @param username
     */
-  case class TeamMembershipQuery(username: String)
 
   case class TeamMembershipQueryResult(username: String, teamId: Int, teamName: String, dateFrom: Option[Date])
 
-  /**
-    * Query for all teams or one specific response
-    */
-  case class TeamQueryResponse(teams: Option[Teams])
+  case class SingleTeamMembershipQueryResponse(team: Option[TeamMemberships])
+
+  case class AllTeamMembershipQueryResponse(teams: List[SingleTeamMembershipQueryResponse])
 
   case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 
   case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+
+  /**
+    * Query for all employees
+    */
+  case class EmployeesQuery()
+
+  case class EmployeesQueryResponse(employees: List[String])
 
   object ReportQueryAggregationType extends Enumeration {
     val DAILY = Value("daily")

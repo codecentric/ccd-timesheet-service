@@ -1,12 +1,11 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.{LocalDate, LocalDateTime, ZoneId}
+import java.time.LocalDate
 import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 import java.util.Date
 
 import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, UserUtilization}
-import de.codecentric.ccdashboard.service.timesheet.messages.{WorkScheduleEntry}
-
+import de.codecentric.ccdashboard.service.timesheet.messages.WorkScheduleEntry
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 /**
   * Created by tbinias on 23.12.16.
@@ -25,7 +24,7 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
     (if (userStartOfYear.asLocalDate.getDayOfMonth == 15) 0.5 else 1)
   final val vacationDaysThisYear = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
 
-  final val workDaysThisYear = fullYearSchedules.filter(_.requiredHours > 0).size
+  final val workDaysThisYear = fullYearSchedules.count(_.requiredHours > 0)
   private val userSchedules = fullYearSchedules.filter(s => s.workDate.after(userStartOfYear) || s.workDate.equals(userStartOfYear))
   final val userWorkDaysThisYear = getWorkDaysFromUserSchedules(userSchedules)
   final val userWorkDaysAvailabilityRate = userWorkDaysThisYear / workDaysThisYear
