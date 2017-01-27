@@ -5,7 +5,6 @@ object Version {
   final val AkkaHttp      = "10.0.1"
   final val AkkaHttpJson  = "1.9.0" // FIXME latest is 1.11.0
   final val AkkaLog4j     = "1.2.0"
-  final val AkkaCors      = "0.1.10"
   final val Circe         = "0.5.1" // FIXME latest is 0.6.1
   final val Csup          = "0.0.5-SNAPSHOT" // FIXME don't depend on snapshots
   final val Logback       = "1.1.7"
@@ -23,7 +22,6 @@ object Library {
   val akkaHttpCirce        = "de.heikoseeberger"          %% "akka-http-circe"         % Version.AkkaHttpJson
   val akkaHttpTestkit      = "com.typesafe.akka"          %% "akka-http-testkit"       % Version.AkkaHttp
   val akkaTestkit          = "com.typesafe.akka"          %% "akka-testkit"            % Version.Akka
-  val akkaCors             = "ch.megard"                  %% "akka-http-cors"          % Version.AkkaCors
   val circeCore            = "io.circe"                   %% "circe-core"              % Version.Circe
   val circeGeneric         = "io.circe"                   %% "circe-generic"           % Version.Circe
   val circeJava8           = "io.circe"                   %% "circe-java8"             % Version.Circe
