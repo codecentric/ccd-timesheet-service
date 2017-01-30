@@ -23,7 +23,7 @@ object CassandraReader extends DatabaseReader {
 
   lazy val cassandraContextConfig: CassandraContextConfig = createCassandraContext()
 
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig) with Decoders
+  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
 
   import ctx._
 
@@ -63,6 +63,16 @@ object CassandraReader extends DatabaseReader {
     Issue(issueId, issueKey, issueUrl, summary, component, dailyRate, invoicing, issueType)
   }
 
+  private val teamMemberExtractor = (row: Row)  => {
+    val memberName = row.getString("memberName")
+    val dateFrom = row.getTimestamp("dateFrom")
+    val dateTo = row.getTimestamp("dateTo")
+    val availability = row.getInt("availability")
+
+    TeamMember(memberName, Some(dateFrom), Some(dateTo), Some(availability))
+  }
+
+
   def getTeamById(id: Int): Future[Team] = {
     ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE id = $id",
       extractor = teamExtractor
@@ -75,13 +85,30 @@ object CassandraReader extends DatabaseReader {
     )
   }
 
-  def getTeam2s(): Future[List[Team2]] = {
-    ctx.run(query[Team2])
-  }
-
   def getIssueById(id: String): Future[Issue] = {
     ctx.executeQuerySingle[Issue](s"SELECT id, issue_key, issue_url, summary, components, custom_fields, issue_type FROM issue WHERE id = '$id'",
       extractor = issueExtractor)
+  }
+
+  def getEmployees(): Future[EmployeesQueryResponse] = {
+    ctx.executeQuery[String]("SELECT membername from team_member",
+          extractor = row => row.getString("membername")
+    ) .map(_.distinct.sorted)
+      .map(EmployeesQueryResponse)
+  }
+
+  def getTeamMembers(teamId: Int): Future[SingleTeamMembershipQueryResponse] = {
+    val teamMembersFuture = ctx.executeQuery[TeamMember](
+      s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $teamId",
+      extractor = teamMemberExtractor)
+
+    teamMembersFuture.map(teamMembers => {
+      SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, teamMembers)))
+    })
+  }
+
+  def getTeamIds(): Future[List[Int]] = {
+    ctx.executeQuery[Int]("SELECT DISTINCT teamId FROM team_member", extractor = row => row.getInt("teamId"))
   }
 
   def getUserSchedules(username: String, from: Date, to: Date): Future[List[UserSchedule]] = {
@@ -147,23 +174,5 @@ object CassandraReader extends DatabaseReader {
     val socketOptions = new SocketOptions().setConnectTimeoutMillis(60000).setReadTimeoutMillis(60000)
     new CassandraContextConfigWithSocketOptions(dbConfig, socketOptions)
   }
-
-}
-
-trait Decoders {
-  this: CassandraSessionContext[_] =>
-
-  import scala.collection.JavaConverters._
-
-  implicit def setDecoder: Decoder[Map[String, TeamMemberInfo]] = decoder((index, row) => {
-    val cassandraMap = row.getMap(index, classOf[String], classOf[TupleValue])
-    cassandraMap.asScala.mapValues(t => {
-      val from = t.get(0, classOf[Date])
-      val to = t.get(1, classOf[Date])
-      val availability = t.get(2, classOf[Double])
-
-      TeamMemberInfo(Option(from), Option(to), availability = availability.toInt)
-    }).toMap
-  })
 
 }

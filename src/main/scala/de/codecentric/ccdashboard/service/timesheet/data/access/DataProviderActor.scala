@@ -149,30 +149,25 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       }
       issueQueryCount = issueQueryCount + 1
 
-    case TeamQuery(teamId) =>
+    case SingleTeamMembershipQuery(teamId) =>
       val requester = sender()
-      log.debug("Received TeamQuery")
-      teamId match {
-        case Some(id) =>
-          dbReader.getTeamById(id)
-            .map(t => TeamQueryResponse(Some(Teams(List(t)))))
-            .pipeTo(requester)
-
-        case None =>
-          dbReader.getTeams()
-            .map(t => TeamQueryResponse(Some(Teams(t))))
-            .pipeTo(requester)
-      }
-
-      teamQueryCount = teamQueryCount + 1
-
-    case TeamMembershipQuery(username) =>
-      val requester = sender()
-      log.debug("Received TeamMembershipQuery")
-
-      dbReader.getTeamMembership(username).pipeTo(requester)
-
       teamMembershipQueryCount = teamMembershipQueryCount + 1
+      dbReader.getTeamMembers(teamId).pipeTo(requester)
+
+
+    case AllTeamMembershipQuery =>
+      val requester = sender()
+      teamMembershipQueryCount = teamMembershipQueryCount + 1
+
+      dbReader.getTeamIds.flatMap(teamIds => {
+          Future.sequence(teamIds.map(dbReader.getTeamMembers))
+      }).map(AllTeamMembershipQueryResponse)
+        .pipeTo(requester)
+
+    case EmployeesQuery =>
+      val requester = sender()
+      val query = dbReader.getEmployees()
+      query.pipeTo(requester)
 
     case UserReportQuery(username, from, to, aggregationType) =>
       val requester = sender()

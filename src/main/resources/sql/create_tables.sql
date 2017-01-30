@@ -69,12 +69,4 @@ CREATE TABLE IF NOT EXISTS team_member (
   PRIMARY KEY(teamId, memberName)
 );
 
-
-CREATE TABLE team_two (
-  id      INT,
-  name    TEXT,
-  members MAP<TEXT, FROZEN<TUPLE<TIMESTAMP, TIMESTAMP, INT>>>,
-  PRIMARY KEY(id)
-);
-
 CREATE INDEX ON team (KEYS(members));

@@ -47,8 +47,6 @@ class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging 
       dbWriter.deleteTeams()
       dbWriter.insertTeams(teams)
 
-      dbWriter.deleteTeam2s()
-
       lastWrite = Some(LocalDateTime.now())
 
     case TeamMemberships(teamId, members) =>

@@ -25,7 +25,7 @@ object CassandraWriter extends DatabaseWriter {
 
   lazy val metaData: Metadata = cassandraContextConfig.cluster.getMetadata()
 
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig) with Encoders
+  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
 
   import ctx._
 
@@ -47,24 +47,12 @@ object CassandraWriter extends DatabaseWriter {
     })
   }
 
-  def insertTeams(ts: List[Team]): Future[Unit] = {
-    val futures = ts.map(team =>
+  def insertTeams(ts: List[Team]): Future[Unit] = Future {
+    ts.foreach(team =>
       ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
         st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
       )
     )
-
-    Future.reduce(futures)((_,_) => ())
-  }
-
-  def insertTeam2s(ts: List[Team2]): Future[Unit] = {
-    val futures = ts.map(team =>
-      ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
-        st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
-      )
-    )
-
-    Future.reduce(futures)((_,_) => ())
   }
 
   def insertUtilization(u: UserUtilization): Future[Unit] = ctx.run(quote {
@@ -85,9 +73,6 @@ object CassandraWriter extends DatabaseWriter {
     query[Team].delete
   })
 
-  def deleteTeam2s(): Future[Unit] = ctx.run(quote {
-    query[Team2].delete
-  })
 
   def updateTeams(ms: java.util.Map[String, Date], teamId: Int): Future[Unit] = {
     ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
@@ -95,18 +80,13 @@ object CassandraWriter extends DatabaseWriter {
     )
   }
 
-  def updateTeam2s(ms: Map[String, TeamMemberInfo], teamId: Int): Future[Unit] = ctx.run(quote {
-    query[Team2].filter(_.id == lift(teamId)).update(_.members -> lift(ms))
-  })
 
-  def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit] = {
-    val futures = members.map(member =>
+  def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit] = Future {
+    members.foreach(member =>
       ctx.executeAction("INSERT INTO team_member (teamId, memberName, dateFrom, dateTo, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
         st.bind(teamId.asInstanceOf[java.lang.Integer], member.name, member.dateFrom.orNull, member.dateTo.orNull, member.availability.getOrElse(100).asInstanceOf[java.lang.Integer])
       )
     )
-
-    Future.reduce(futures)((_,_) => ())
   }
 
 
@@ -119,21 +99,6 @@ object CassandraWriter extends DatabaseWriter {
   }
 
 
-}
-
-trait Encoders {
-  this: CassandraSessionContext[_] =>
-
-  import scala.collection.JavaConverters._
-
-  implicit def setEncoder: Encoder[Map[String, TeamMemberInfo]] =
-    encoder((index, value, row) => row.setMap(index, value.mapValues {
-      case TeamMemberInfo(startDate, endDate, availability, _, _) => (startDate.orNull, endDate.orNull, availability)
-    }.mapValues(value => {
-      tupleType.newValue(value._1, value._2, value._3.asInstanceOf[java.lang.Double])
-    }).asJava))
-
-  lazy val tupleType = CassandraWriter.metaData.newTupleType(DataType.date(), DataType.date(), DataType.cint())
 }
 
 
