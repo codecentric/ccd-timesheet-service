@@ -14,9 +14,9 @@ import de.codecentric.ccdashboard.service.timesheet.data.model._
 package object messages {
 
   /* Life-cycle messages */
-  case class Start()
+  case object Start
 
-  case class Stop()
+  case object Stop
 
   /* Query messages */
   /**
@@ -141,13 +141,13 @@ package object messages {
 
   case class TempoUserScheduleQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
 
-  case class JiraUserQueryTask()
+  case object JiraUserQueryTask
 
   case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
 
   case class JiraIssueDetailsQueryTaskResponse(issue: Issue)
 
-  case class JiraTempoTeamQueryTask()
+  case object JiraTempoTeamQueryTask
 
   case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
 
