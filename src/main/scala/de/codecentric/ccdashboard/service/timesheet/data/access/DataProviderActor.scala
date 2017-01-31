@@ -159,7 +159,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val requester = sender()
       teamMembershipQueryCount = teamMembershipQueryCount + 1
 
-      dbReader.getTeamIds.flatMap(teamIds => {
+      dbReader.getTeamIds().flatMap(teamIds => {
           Future.sequence(teamIds.map(dbReader.getTeamMembers))
       }).map(AllTeamMembershipQueryResponse)
         .pipeTo(requester)
