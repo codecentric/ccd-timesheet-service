@@ -69,7 +69,7 @@ object TimesheetService extends App {
     val dbConfig = conf.getConfig(dbConfigKey)
 
     val socketOptions = new SocketOptions().setConnectTimeoutMillis(60000).setReadTimeoutMillis(60000)
-    val cassandraContextConfig = new CassandraContextConfigWithSocketOptions(dbConfig, socketOptions)
+    val cassandraContextConfig = new CassandraContextConfigWithOptions(dbConfig, socketOptions = Some(socketOptions))
 
     // create and start our main actors and components
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")

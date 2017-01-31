@@ -57,7 +57,7 @@ class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging 
       // Cassandra doesn't allow null values in collections so if there is no
       // Date available, use the 'initial' Date (Jan. 1 1970)
       val membersMap = members.map {
-        case TeamMember(name, dateFrom, dateTo, availability) => name -> dateFrom.getOrElse(new Date(0))
+        case TeamMember(teamId, name, dateFrom, dateTo, availability) => name -> dateFrom.getOrElse(new Date(0))
       }.toMap.asJava
 
       dbWriter.updateTeams(membersMap, teamId)

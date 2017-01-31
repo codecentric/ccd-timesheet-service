@@ -7,15 +7,11 @@ import com.datastax.driver.core._
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseWriter
-import de.codecentric.ccdashboard.service.timesheet.util.CassandraContextConfigWithSocketOptions
-import io.getquill.context.cassandra.CassandraSessionContext
+import de.codecentric.ccdashboard.service.timesheet.util.CassandraContextConfigWithOptions
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.reflect.ClassTag
-import scala.collection.immutable.Map
-
 
 object CassandraWriter extends DatabaseWriter {
 
@@ -73,32 +69,28 @@ object CassandraWriter extends DatabaseWriter {
     query[Team].delete
   })
 
-
   def updateTeams(ms: java.util.Map[String, Date], teamId: Int): Future[Unit] = {
     ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
       st.bind(ms, teamId.asInstanceOf[java.lang.Integer])
     )
   }
 
-
   def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit] = Future {
     members.foreach(member =>
-      ctx.executeAction("INSERT INTO team_member (teamId, memberName, dateFrom, dateTo, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
+      ctx.executeAction("INSERT INTO team_member (team_id, member_name, date_from, date_to, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
         st.bind(teamId.asInstanceOf[java.lang.Integer], member.name, member.dateFrom.orNull, member.dateTo.orNull, member.availability.getOrElse(100).asInstanceOf[java.lang.Integer])
       )
     )
   }
-
 
   private def createCassandraContext(): CassandraContextConfig = {
     val conf = ConfigFactory.load()
     val dbConfigKey = conf.getString("timesheet-service.database-config-key")
     val dbConfig = conf.getConfig(dbConfigKey)
     val socketOptions = new SocketOptions().setConnectTimeoutMillis(60000).setReadTimeoutMillis(60000)
-    new CassandraContextConfigWithSocketOptions(dbConfig, socketOptions)
+    val poolingOptions = new PoolingOptions().setMaxQueueSize(Integer.MAX_VALUE)
+    new CassandraContextConfigWithOptions(dbConfig, socketOptions = Some(socketOptions), poolingOptions = Some(poolingOptions))
   }
-
-
 }
 
 
