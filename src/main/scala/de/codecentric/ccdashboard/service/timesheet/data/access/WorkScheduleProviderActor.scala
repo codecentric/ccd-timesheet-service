@@ -6,9 +6,8 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
-import com.datastax.driver.core.{Row, TypeTokens}
 import com.google.common.reflect.TypeToken
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Team, UserSchedule, UserUtilization}
+import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, UserUtilization}
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
@@ -26,7 +25,6 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
   import ctx._
 
   private val stringToken = TypeToken.of(classOf[String])
-  private val stringMapToken = TypeTokens.mapOf(stringToken, stringToken)
   private val dateToken = TypeToken.of(classOf[java.util.Date])
 
   implicit class DateRangeFilter(a: Date) {
@@ -104,14 +102,6 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
       .filter(_.username == lift(username))
       .filter(_.day >= lift(from))
       .filter(_.day <= lift(to))
-  }
-
-  private val teamExtractor: Row => Team = {
-    row => {
-      val id = row.getInt(0)
-      val name = row.getString(1)
-      Team(id, name)
-    }
   }
 
   def getTeamMembershipStartDates(username: String): Future[List[Date]] = {

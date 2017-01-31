@@ -60,7 +60,7 @@ package object encoding {
       if ("" == s) Xor.left(DecodingFailure("Could not parse LocalDate - string is empty", c.history))
       else {
         try Xor.right(LocalDate.from(DateTimeFormatter.ISO_DATE.parse(s))) catch {
-          case ex: DateTimeParseException => Xor.left(DecodingFailure("Could not parse LocalDate", c.history))
+          case _: DateTimeParseException => Xor.left(DecodingFailure("Could not parse LocalDate", c.history))
         }
       }
     )
@@ -75,7 +75,7 @@ package object encoding {
       if ("" == s) Xor.right(None)
       else {
         try Xor.right(Some(localDateEncoder.f(LocalDate.from(DateTimeFormatter.ISO_DATE.parse(s))))) catch {
-          case ex: DateTimeParseException => Xor.left(DecodingFailure("Could not parse Date", c.history))
+          case _: DateTimeParseException => Xor.left(DecodingFailure("Could not parse Date", c.history))
         }
       }
     }
@@ -107,7 +107,7 @@ package object encoding {
         .map(localDateEncoder.f)
       val requiredSecondsOpt = obj("requiredSeconds").flatMap(_.asNumber).map(_.truncateToInt)
       JiraUserScheduleDay(dateOpt.get, requiredSecondsOpt.get)
-    }.leftMap(t => "JiraUserScheduleDad")
+    }.leftMap(_ => "JiraUserScheduleDad")
   )
 
   implicit val jiraUserSchedulesDecoder: Decoder[JiraUserSchedules] = deriveDecoder[JiraUserSchedules]

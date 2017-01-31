@@ -57,7 +57,7 @@ abstract class BaseDataReaderActor(val dataWriter: ActorRef) extends DataReaderA
 
     requestFuture.onComplete {
       case Success(response) => response match {
-        case HttpResponse(StatusCodes.OK, headers, entity, _) =>
+        case HttpResponse(StatusCodes.OK, _, entity, _) =>
           successEntityHandler(entity)
         case HttpResponse(code, _, _, _) =>
           val exception = new RuntimeException(s"Response code was not 404 OK but: $code")

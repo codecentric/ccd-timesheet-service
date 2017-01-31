@@ -115,8 +115,8 @@ package object messages {
     private def add(o1: Option[Double], o2: Option[Double]) = {
       (o1, o2) match {
         case (Some(v1), Some(v2)) => Some(v1 + v2)
-        case (v@Some(v1), _) => v
-        case (_, v@Some(v2)) => v
+        case (v@Some(_), _) => v
+        case (_, v@Some(_)) => v
         case _ => None
       }
     }

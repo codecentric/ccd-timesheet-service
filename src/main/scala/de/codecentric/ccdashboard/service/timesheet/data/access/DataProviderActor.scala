@@ -25,7 +25,6 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
   val importStartDate: LocalDate = startDate
 
   private var userQueryCount = 0L
-  private var teamQueryCount = 0L
   private var teamMembershipQueryCount = 0L
   private var worklogQueryCount = 0L
   private var issueQueryCount = 0L
@@ -184,13 +183,8 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
       val toDate = to.getOrElse(new Date())
 
-      // get all users from the team
+      // get all members of the team
       val usernamesFut = dbReader.getTeamMembers(teamId).map(memberList => memberList.map(_.name))
-
-      // get all usernames from the team that were member within the provided time frame
-      // SELECT name FROM team_member WHERE id = $teamId
-      // raus: userEndDate < queryStartDate
-      // raus: userStartDtae > queryEndDate
 
       usernamesFut.map(usernames => {
         implicit val timeout = Timeout(60.seconds)

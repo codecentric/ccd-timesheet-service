@@ -220,7 +220,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           lastRead = Some(LocalDateTime.now())
           requester ! JiraIssueDetailsQueryTaskResponse(v)
 
-        case Failure(e) =>
+        case Failure(_) =>
       }
 
     case q@JiraTempoTeamQueryTask =>
