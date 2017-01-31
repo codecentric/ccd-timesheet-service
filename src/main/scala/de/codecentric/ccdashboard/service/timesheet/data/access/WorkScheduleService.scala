@@ -1,12 +1,11 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.{LocalDate, LocalDateTime, ZoneId}
+import java.time.LocalDate
 import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 import java.util.Date
 
 import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, UserUtilization}
-import de.codecentric.ccdashboard.service.timesheet.messages.{WorkScheduleEntry}
-
+import de.codecentric.ccdashboard.service.timesheet.messages.WorkScheduleEntry
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 /**
   * Created by tbinias on 23.12.16.

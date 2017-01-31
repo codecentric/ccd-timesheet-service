@@ -10,6 +10,7 @@ services:
     image: ccd-timesheet-service
     ports:
       - "10005:8080"
+    mem_limit: "3072m"
     expose:
       - "8080"
     networks:
@@ -18,6 +19,7 @@ services:
       - cassandra:cassandra
   cassandra:
     build: ./DockerCassandra
+    mem_limit: "2048m"
     expose:
       - "9042"
     networks:

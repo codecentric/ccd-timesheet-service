@@ -8,7 +8,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
@@ -24,12 +24,10 @@ import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.codecentric.ccdashboard.service.timesheet.util._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
-import io.getquill.CassandraContextConfig
-import io.getquill.context.cassandra.cluster.ClusterBuilder
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 /**
   * Created by bjacobs on 12.07.16.
@@ -65,9 +63,6 @@ object TimesheetService extends App {
 
   /**
     * Main start-up function that creates the ActorSystem and Actors
-    *
-    * @param ec
-    * @param materializer
     */
   def startUp(implicit ec: ExecutionContext, materializer: Materializer): Future[ServerBinding] = {
     val dbConfigKey = conf.getString("timesheet-service.database-config-key")
@@ -111,7 +106,7 @@ object TimesheetService extends App {
   /**
     * Defines the service endpoints
     */
-  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer) = {
+  def route(dataProvider: ActorRef, workScheduleProvider: ActorRef)(implicit ec: ExecutionContext, materializer: Materializer): Route = {
     import CirceSupport._
     import Directives._
     import io.circe.generic.auto._
@@ -142,22 +137,17 @@ object TimesheetService extends App {
           get {
             parameters('from.as[Date].?, 'to.as[Date].?) { (from, to) =>
               val query = (dataProvider ? WorklogQuery(username, from, to)).mapTo[WorklogQueryResult]
-              complete(query.map(_.worklogs))
+              complete(query)
             }
           }
         } ~
         path("report") {
           get {
             parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
-              val aggregationTypeTry = aggregationTypeString
+              val aggregationType = aggregationTypeString
                 .map(s => Try(ReportQueryAggregationType.withName(s)))
                 .getOrElse(Success(ReportQueryAggregationType.MONTHLY))
-
-              if (aggregationTypeTry.isFailure) {
-                failWith(new IllegalArgumentException(s"type parameter was invalid. Valid choices: ${ReportQueryAggregationType.values}"))
-              }
-
-              val aggregationType = aggregationTypeTry.get
+                .get
 
               val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
               complete(query)
@@ -186,8 +176,10 @@ object TimesheetService extends App {
           get {
             pathEndOrSingleSlash {
               id match {
-                case Some(teamId) => complete((dataProvider ? SingleTeamMembershipQuery(teamId)).mapTo[SingleTeamMembershipQueryResponse].map(_.team))
-                case None => complete((dataProvider ? AllTeamMembershipQuery).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
+                case Some(teamId) =>
+                  complete((dataProvider ? SingleTeamMembershipQuery(teamId)).mapTo[SingleTeamMembershipQueryResponse].map(_.team))
+                case None =>
+                  complete((dataProvider ? AllTeamMembershipQuery()).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
               }
             }
           }
@@ -205,11 +197,11 @@ object TimesheetService extends App {
               }
             }
           }
-      }
+      } ~
       pathPrefix("employees") {
         get {
           pathEndOrSingleSlash {
-            val query = (dataProvider ? EmployeesQuery).mapTo[EmployeesQueryResponse].map(_.employees)
+            val query = (dataProvider ? EmployeesQuery()).mapTo[EmployeesQueryResponse].map(_.employees)
             complete(query)
           }
         }

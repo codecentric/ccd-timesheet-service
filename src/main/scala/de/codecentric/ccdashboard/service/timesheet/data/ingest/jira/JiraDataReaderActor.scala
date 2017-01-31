@@ -201,7 +201,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           .map(_.availability)
 
         if (mostRecentAvailablilityValue.isEmpty) {
-          log.info(s"No availability value found for user $username, using fixed 100%")
+          log.debug(s"No availability value found for user $username, using fixed 100%")
         }
         val availability = mostRecentAvailablilityValue.getOrElse(1.0)
 
