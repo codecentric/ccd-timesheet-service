@@ -61,12 +61,12 @@ CREATE TABLE team (
 );
 
 CREATE TABLE IF NOT EXISTS team_member (
-  teamId int,
-  memberName text,
-  dateFrom timestamp,
-  dateTo timestamp,
+  team_id int,
+  member_name text,
+  date_from timestamp,
+  date_to timestamp,
   availability int,
-  PRIMARY KEY(teamId, memberName)
+  PRIMARY KEY(team_id, member_name)
 );
 
 CREATE INDEX ON team (KEYS(members));

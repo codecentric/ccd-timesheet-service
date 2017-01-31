@@ -244,7 +244,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
       retrieveTempoTeamMembers(teamId).onComplete {
         case Success(v) =>
           // Inject teamId after parsing since response does not contain it
-          val teamMembers = v.map(_.toTeamMember).toList
+          val teamMembers = v.map(_.toTeamMember.copy(teamId = teamId)).toList
           dataWriter ! TeamMemberships(teamId, teamMembers)
 
           if (remainingTeamIds.isEmpty) {

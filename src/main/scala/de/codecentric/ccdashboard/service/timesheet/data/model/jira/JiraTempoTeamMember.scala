@@ -8,7 +8,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.model.{TeamMember, Team
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
 case class JiraTempoTeamMember(membership: Option[JiraTempoTeamMembership], member: JiraTempoTeamMemberUser) extends TeamMemberable {
-  override def toTeamMember: TeamMember = TeamMember(member.name, membership.flatMap(_.dateFromANSI.flatten), membership.flatMap(_.dateToANSI.flatten), membership.flatMap(_.availability.flatten))
+  override def toTeamMember: TeamMember = TeamMember(-1, member.name, membership.flatMap(_.dateFromANSI.flatten), membership.flatMap(_.dateToANSI.flatten), membership.flatMap(_.availability.flatten))
 }
 
 case class JiraTempoTeamMembership(dateFromANSI: Option[Option[Date]], dateToANSI: Option[Option[Date]], availability: Option[Option[Int]])

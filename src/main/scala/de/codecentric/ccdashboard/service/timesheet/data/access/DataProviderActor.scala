@@ -46,6 +46,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
   }
   }
 
+/*
   private val teamMemberExtractor: Row => TeamMember = { row => {
     val memberName = row.getString("memberName")
     val dateFrom = row.getTimestamp("dateFrom")
@@ -55,6 +56,7 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
     TeamMember(memberName, Some(dateFrom), Some(dateTo), Some(availability))
   }
   }
+*/
 
   private val issueExtractor: Row => Issue = { row => {
     val issueId = row.getString(0)
@@ -312,6 +314,11 @@ class DataProviderActor(conf: Config, cassandraContextConfig: CassandraContextCo
       val teamFut = ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE id = $teamId",
         extractor = teamExtractor
       )
+
+      // get all usernames from the team that were member within the provided time frame
+      // SELECT name FROM team_member WHERE id = $teamId
+      // raus: userEndDate < queryStartDate
+      // raus: userStartDtae > queryEndDate
 
       teamFut.map(team => {
         val usernames = team.members.map(_.keys).getOrElse(Nil)
