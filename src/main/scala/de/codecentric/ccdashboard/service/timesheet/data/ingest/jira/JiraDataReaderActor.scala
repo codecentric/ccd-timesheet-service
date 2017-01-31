@@ -68,7 +68,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
         TempoWorklogQueryTask(now, now.minusDays(jiraConfig.importBatchSizeDays), syncing = !databaseHasBeenInitialized))
 
       // Start Jira User Queries async
-      context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask())
+      context.system.scheduler.scheduleOnce(1.seconds, self, JiraUserQueryTask)
 
       // Query tempo teams
       context.system.scheduler.scheduleOnce(2.seconds, self, JiraTempoTeamQueryTask)
@@ -136,7 +136,7 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
 
-    case q@JiraUserQueryTask() =>
+    case q@JiraUserQueryTask =>
       log.debug("Jira user query task received.")
 
       val ccUsersPromise = Promise[List[User]]

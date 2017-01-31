@@ -14,9 +14,9 @@ import de.codecentric.ccdashboard.service.timesheet.data.model._
 package object messages {
 
   /* Life-cycle messages */
-  case class Start()
+  case object Start
 
-  case class Stop()
+  case object Stop
 
   /* Query messages */
   /**
@@ -59,15 +59,11 @@ package object messages {
     */
   case class IssueQueryResult(issue: Option[Issue])
 
-  /**
-    * Query for one specific team
-    */
+  case class TeamQuery(teamId: Option[Int] = None)
   case class SingleTeamMembershipQuery(teamId: Int)
 
-  /**
-    * Query for all teams
-    */
-  case class AllTeamMembershipQuery()
+  case class TeamMemberQuery(teamId: Option[Int] = None)
+  case object AllTeamMembershipQuery
 
   /**
     * Query in which team a user is and since when
@@ -85,8 +81,8 @@ package object messages {
 
   /**
     * Query for all employees
-    */
-  case class EmployeesQuery()
+   */
+  case object EmployeesQuery
 
   case class EmployeesQueryResponse(employees: List[String])
 
@@ -136,13 +132,13 @@ package object messages {
 
   case class TempoUserScheduleQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
 
-  case class JiraUserQueryTask()
+  case object JiraUserQueryTask
 
   case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
 
   case class JiraIssueDetailsQueryTaskResponse(issue: Issue)
 
-  case class JiraTempoTeamQueryTask()
+  case object JiraTempoTeamQueryTask
 
   case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
 

@@ -19,6 +19,7 @@ import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
+import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
 import de.codecentric.ccdashboard.service.timesheet.util._
@@ -72,7 +73,10 @@ object TimesheetService extends App {
 
     // create and start our main actors and components
     val dataImporter = system.actorOf(Props(new DataIngestActor(conf, cassandraContextConfig)), "data-importer")
-    val dataProvider = system.actorOf(Props(new DataProviderActor(conf, cassandraContextConfig)), "data-provider")
+    val dataProvider = system.actorOf(Props(new DataProviderActor(
+      LocalDate.parse(conf.getString("timesheet-service.data-import.start-date")),
+      CassandraReader
+    )), "data-provider")
     val workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider,workScheduleProvider), interface, port)
 
@@ -110,13 +114,13 @@ object TimesheetService extends App {
     implicit val timeout = Timeout(60.seconds)
 
     /* Akka HTTP Unmarshallers */
-    implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { ex => str =>
+    implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { _ => str =>
       Future {
         LocalDate.parse(str)
       }
     }
 
-    implicit val dateUnmarshaller = Unmarshaller[String, Date] { ex => str =>
+    implicit val dateUnmarshaller = Unmarshaller[String, Date] { _ => str =>
       Future {
         new SimpleDateFormat("yyyy-MM-dd").parse(str)
       }
@@ -167,7 +171,6 @@ object TimesheetService extends App {
           }
         }
       } ~
-      // This endpoint is meant to replace the team endpoint.
       pathPrefix("team") {
         path(IntNumber.?) { id =>
           get {
@@ -176,7 +179,7 @@ object TimesheetService extends App {
                 case Some(teamId) =>
                   complete((dataProvider ? SingleTeamMembershipQuery(teamId)).mapTo[SingleTeamMembershipQueryResponse].map(_.team))
                 case None =>
-                  complete((dataProvider ? AllTeamMembershipQuery()).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
+                  complete((dataProvider ? AllTeamMembershipQuery).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
               }
             }
           }
@@ -198,7 +201,7 @@ object TimesheetService extends App {
       pathPrefix("employees") {
         get {
           pathEndOrSingleSlash {
-            val query = (dataProvider ? EmployeesQuery()).mapTo[EmployeesQueryResponse].map(_.employees)
+            val query = (dataProvider ? EmployeesQuery).mapTo[EmployeesQueryResponse].map(_.employees)
             complete(query)
           }
         }
