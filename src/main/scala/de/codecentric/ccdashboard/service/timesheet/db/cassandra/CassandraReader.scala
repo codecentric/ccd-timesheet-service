@@ -45,9 +45,8 @@ object CassandraReader extends DatabaseReader {
   private val teamExtractor = (row: Row) => {
     val id = row.getInt(0)
     val name = row.getString(1)
-    val map = row.getMap(2, stringToken, dateToken).asScala.toMap.mapValues(d => if (d.getTime == 0) None else Some(d))
 
-    Team(id, name, Some(map))
+    Team(id, name)
   }
 
   private val issueExtractor = (row: Row) => {
@@ -75,13 +74,7 @@ object CassandraReader extends DatabaseReader {
 
 
   def getTeamById(id: Int): Future[Team] = {
-    ctx.executeQuerySingle(s"SELECT id, name, members FROM team WHERE id = $id",
-      extractor = teamExtractor
-    )
-  }
-
-  def getTeams(): Future[List[Team]] = {
-    ctx.executeQuery(s"SELECT id, name, members FROM team",
+    ctx.executeQuerySingle(s"SELECT id, name FROM team WHERE id = $id",
       extractor = teamExtractor
     )
   }
@@ -98,14 +91,10 @@ object CassandraReader extends DatabaseReader {
       .map(EmployeesQueryResponse)
   }
 
-  def getTeamMembers(teamId: Int): Future[SingleTeamMembershipQueryResponse] = {
-    val teamMembersFuture = ctx.executeQuery[TeamMember](
+  def getTeamMembers(teamId: Int): Future[List[TeamMember]] = {
+    ctx.executeQuery[TeamMember](
       s"SELECT team_id, member_name, date_from, date_to, availability FROM team_member WHERE team_id = $teamId",
       extractor = teamMemberExtractor)
-
-    teamMembersFuture.map(teamMembers => {
-      SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, teamMembers)))
-    })
   }
 
   def getTeamIds(): Future[List[Int]] = {
@@ -129,10 +118,9 @@ object CassandraReader extends DatabaseReader {
     ctx.run(userSchedule(username, from, to))
   }
 
-  def getTeamMembership(username: String): Future[List[TeamMembershipQueryResult]] = {
-    ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
-      extractor = teamExtractor)
-      .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
+  def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
+    ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+      extractor = row => row.get(0, dateToken))
   }
 
   def getUserByName(username: String): Future[Option[User]] = {

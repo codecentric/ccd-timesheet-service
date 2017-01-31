@@ -36,12 +36,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
     val toDate = to.getOrElse(new Date())
 
-    val employeeSinceDateFuture = dbReader
-      .getTeamMembership(username).map({
-      _.flatMap({
-        _.dateFrom
-      })
-    })
+    val employeeSinceDateFuture = dbReader.getTeamMembershipStartDates(username)
 
     val dateToUse = for {
       employeeSinceDateList <- employeeSinceDateFuture
@@ -139,7 +134,9 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     case SingleTeamMembershipQuery(teamId) =>
       val requester = sender()
       teamMembershipQueryCount = teamMembershipQueryCount + 1
-      dbReader.getTeamMembers(teamId).pipeTo(requester)
+      dbReader.getTeamMembers(teamId)
+        .map(members => SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, members))))
+        .pipeTo(requester)
 
 
     case AllTeamMembershipQuery =>
@@ -147,7 +144,11 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       teamMembershipQueryCount = teamMembershipQueryCount + 1
 
       dbReader.getTeamIds().flatMap(teamIds => {
-          Future.sequence(teamIds.map(dbReader.getTeamMembers))
+        Future.sequence(
+          teamIds.map(teamId => {
+            dbReader.getTeamMembers(teamId)
+              .map(members => SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, members))))
+          }))
       }).map(AllTeamMembershipQueryResponse)
         .pipeTo(requester)
 
@@ -184,16 +185,14 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val toDate = to.getOrElse(new Date())
 
       // get all users from the team
-      val teamFut = dbReader.getTeamById(teamId)
+      val usernamesFut = dbReader.getTeamMembers(teamId).map(memberList => memberList.map(_.name))
 
       // get all usernames from the team that were member within the provided time frame
       // SELECT name FROM team_member WHERE id = $teamId
       // raus: userEndDate < queryStartDate
       // raus: userStartDtae > queryEndDate
 
-      teamFut.map(team => {
-        val usernames = team.members.map(_.keys).getOrElse(Nil)
-
+      usernamesFut.map(usernames => {
         implicit val timeout = Timeout(60.seconds)
 
         val usersReportsFut = Future.sequence(usernames.map(username => {

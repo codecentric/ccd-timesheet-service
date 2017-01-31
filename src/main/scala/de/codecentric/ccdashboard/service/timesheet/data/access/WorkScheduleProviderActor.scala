@@ -1,7 +1,7 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.{LocalDate, LocalDateTime, ZoneId}
-import java.time.temporal.{ChronoUnit, TemporalAdjusters}
+import java.time.temporal.TemporalAdjusters
+import java.time.{LocalDate, LocalDateTime}
 import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
@@ -13,7 +13,7 @@ import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
-import scala.collection.JavaConverters._
+import scala.concurrent.Future
 
 
 /**
@@ -50,10 +50,10 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
       val resultFuture = for {
          fullYearSchedules <- ctx.run(userSchedule(username, startOfYear.asUtilDate, endOfYear.asUtilDate))
          fullYearReports <- ctx.run(userReport(username, startOfYear.asUtilDate, endOfYear.asUtilDate))
-         employeeSince <- teamMembershipQuery(username).map(_.flatMap(_.dateFrom))
+         employeeStartDates <- getTeamMembershipStartDates(username)
       } yield {
          val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports,
-           employeeSince.headOption, startOfYear.getYear)
+           employeeStartDates.sorted.headOption, startOfYear.getYear)
 
          val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(getEndDate(startOfYear.getYear).asUtilDate)
 
@@ -110,15 +110,12 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
     row => {
       val id = row.getInt(0)
       val name = row.getString(1)
-      val map = row.getMap(2, stringToken, dateToken).asScala.toMap.mapValues(d => if (d.getTime == 0) None else Some(d))
-      Team(id, name, Some(map))
+      Team(id, name)
     }
   }
 
-  def teamMembershipQuery(username: String) = {
-    ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
-      extractor = teamExtractor)
-      .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
+  def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
+    ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+      extractor = row => row.get(0, dateToken))
   }
-
 }

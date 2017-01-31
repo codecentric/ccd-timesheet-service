@@ -50,17 +50,8 @@ class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging 
       lastWrite = Some(LocalDateTime.now())
 
     case TeamMemberships(teamId, members) =>
-      import scala.collection.JavaConverters._
-
       log.debug(s"Received ${members.size} members for team $teamId to store")
-      // insert members here as map into table team
-      // Cassandra doesn't allow null values in collections so if there is no
-      // Date available, use the 'initial' Date (Jan. 1 1970)
-      val membersMap = members.map {
-        case TeamMember(teamId, name, dateFrom, dateTo, availability) => name -> dateFrom.getOrElse(new Date(0))
-      }.toMap.asJava
 
-      dbWriter.updateTeams(membersMap, teamId)
       dbWriter.insertTeamMembers(members,teamId)
 
       lastWrite = Some(LocalDateTime.now())

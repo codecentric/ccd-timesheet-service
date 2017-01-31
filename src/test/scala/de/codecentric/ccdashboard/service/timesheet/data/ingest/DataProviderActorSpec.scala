@@ -1,11 +1,12 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.time.LocalDate
+import java.util.Date
 
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Team}
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Team, TeamMember}
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import org.scalamock.scalatest.MockFactory
@@ -38,7 +39,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
-      (reader.getTeamMembership _).expects(name).returning(Future(List.empty))
+      (reader.getTeamMembershipStartDates _).expects(name).returning(Future(List.empty))
 
       actorRef ! UserQuery(name)
     }
@@ -49,7 +50,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
-      (reader.getTeamMembership _).expects(name).returning(Future(List.empty))
+      (reader.getTeamMembershipStartDates _).expects(name).returning(Future(List.empty))
 
       actorRef ! UserReportQuery(name, None, None, ReportQueryAggregationType.MONTHLY)
     }
@@ -73,7 +74,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val teamId = 101
 
-      (reader.getTeamMembers _).expects(teamId).returning(Future(SingleTeamMembershipQueryResponse(None)))
+      (reader.getTeamMembers _).expects(teamId).returning(Future(List.empty))
 
       actorRef ! SingleTeamMembershipQuery(teamId)
     }
@@ -100,9 +101,9 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
       val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
       val teamId = 101
-      val team = Team(42, "test", None)
 
-      (reader.getTeamById _).expects(teamId).returning(Future(team))
+      (reader.getTeamMembers _).expects(teamId).returning(Future(List(TeamMember(101, "user1", None, None, Some(100)))))
+      (reader.getTeamMembershipStartDates _).expects("user1").returning(Future(List(new Date())))
 
       actorRef ! TeamReportQuery(teamId, None, None, ReportQueryAggregationType.MONTHLY)
     }

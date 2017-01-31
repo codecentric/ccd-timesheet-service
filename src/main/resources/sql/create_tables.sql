@@ -56,7 +56,6 @@ CREATE TABLE issue (
 CREATE TABLE team (
   id      INT,
   name    TEXT,
-  members MAP<TEXT, TIMESTAMP>,
   PRIMARY KEY(id)
 );
 
@@ -68,5 +67,3 @@ CREATE TABLE IF NOT EXISTS team_member (
   availability int,
   PRIMARY KEY(team_id, member_name)
 );
-
-CREATE INDEX ON team (KEYS(members));
