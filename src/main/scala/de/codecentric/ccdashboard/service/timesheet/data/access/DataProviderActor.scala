@@ -5,25 +5,17 @@ import java.time.temporal.TemporalAdjusters
 import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
-import akka.pattern.pipe
-import akka.pattern.ask
+import akka.pattern.{ask, pipe}
 import akka.util.Timeout
-import com.datastax.driver.core.Row
-import com.google.common.reflect.TypeToken
-import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
-import de.codecentric.ccdashboard.service.timesheet.db.{DatabaseReader, DatabaseWriter}
-import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraReader
+import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
-import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 import scala.concurrent.duration._
-
+import scala.util.{Failure, Success}
 
 /**
   * Created by bjacobs on 18.07.16.
@@ -32,65 +24,13 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
   val importStartDate: LocalDate = startDate
 
-
   private var userQueryCount = 0L
   private var teamQueryCount = 0L
   private var teamMembershipQueryCount = 0L
   private var worklogQueryCount = 0L
   private var issueQueryCount = 0L
 
-
   import context.dispatcher
-
-
-  def worklogQuery(username: String): Quoted[Query[Worklog]] = {
-    query[Worklog].filter(_.username == lift(username))
-  }
-
-  def worklogQuery(username: String, from: Option[Date], to: Option[Date]): Quoted[Query[Worklog]] = {
-    (from, to) match {
-      case (Some(a), Some(b)) => worklogQuery(username).filter(_.workDate >= lift(a)).filter(_.workDate <= lift(b))
-      case (Some(a), None) => worklogQuery(username).filter(_.workDate >= lift(a))
-      case (None, Some(b)) => worklogQuery(username).filter(_.workDate <= lift(b))
-      case (None, None) => worklogQuery(username)
-    }
-  }
-
-  val userQuery = quote {
-    query[User]
-  }
-
-  val teamQuery = quote {
-    query[Team]
-  }
-
-  def userReport(username: String, from: Date, to: Date): Quoted[Query[UserUtilization]] = {
-    query[UserUtilization]
-      .filter(_.username == lift(username))
-      .filter(_.day >= lift(from))
-      .filter(_.day <= lift(to))
-  }
-
-  def userSchedule(username: String, from: Date, to: Date): Quoted[Query[UserSchedule]] = {
-    query[UserSchedule]
-      .filter(_.username == lift(username))
-      .filter(_.workDate >= lift(from))
-      .filter(_.workDate <= lift(to))
-  }
-
-  def userScheduleQuery(username: String, from: Date, to: Date) = {
-    ctx.run(userSchedule(username, from, to))
-  }
-
-  def teamMembershipQuery(username: String) = {
-    ctx.executeQuery(s"SELECT id, name, members FROM team WHERE members contains key '$username'",
-      extractor = teamExtractor)
-      .map(teams => teams.map(team => TeamMembershipQueryResult(username, team.id, team.name, team.members.flatMap(_.get(username)).flatten)))
-  }
-
-  def issueQuery(id: String): Quoted[Query[Issue]] = {
-    query[Issue].filter(_.id == lift(id))
-  }
 
   def getEmployeeSpecificDateRange(from: Option[Date], to: Option[Date], username: String): (Future[Date], Date) = {
     val fromDate = from.getOrElse(localDateEncoder.f(importStartDate))
@@ -145,20 +85,6 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     val usedHours = reports.filter(_._1.before(tomorrow)).flatMap(_._2.vacationHours).sum
     val plannedHours = reports.filter(_._1.after(today)).flatMap(_._2.vacationHours).sum
     VacationHours(usedHours, plannedHours, 30 * 8 - usedHours - plannedHours)
-  }
-
-  def getTeamMembers(teamId: Int): Future[SingleTeamMembershipQueryResponse] = {
-    val teamMembersFuture = ctx.executeQuery[TeamMember](
-      s"SELECT teamId, memberName, dateFrom, dateTo, availability FROM team_member WHERE teamId = $teamId",
-      extractor = teamMemberExtractor)
-
-    teamMembersFuture.map(teamMembers => {
-      SingleTeamMembershipQueryResponse(Some(TeamMemberships(teamId, teamMembers)))
-    })
-  }
-
-  def getTeamIds: Future[List[Int]] = {
-    ctx.executeQuery[Int]("SELECT DISTINCT teamId FROM team_member", extractor = row => row.getInt("teamId"))
   }
 
   def receive: Receive = {

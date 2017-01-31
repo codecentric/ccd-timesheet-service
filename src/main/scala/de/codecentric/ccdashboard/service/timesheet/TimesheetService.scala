@@ -13,7 +13,7 @@ import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.util.Timeout
-import com.datastax.driver.core.{Cluster, SocketOptions}
+import com.datastax.driver.core.SocketOptions
 import com.github.bjoernjacobs.csup.CsUp
 import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
@@ -114,13 +114,13 @@ object TimesheetService extends App {
     implicit val timeout = Timeout(60.seconds)
 
     /* Akka HTTP Unmarshallers */
-    implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { ex => str =>
+    implicit val localDateUnmarshaller = Unmarshaller[String, LocalDate] { _ => str =>
       Future {
         LocalDate.parse(str)
       }
     }
 
-    implicit val dateUnmarshaller = Unmarshaller[String, Date] { ex => str =>
+    implicit val dateUnmarshaller = Unmarshaller[String, Date] { _ => str =>
       Future {
         new SimpleDateFormat("yyyy-MM-dd").parse(str)
       }
@@ -179,7 +179,7 @@ object TimesheetService extends App {
                 case Some(teamId) =>
                   complete((dataProvider ? SingleTeamMembershipQuery(teamId)).mapTo[SingleTeamMembershipQueryResponse].map(_.team))
                 case None =>
-                  complete((dataProvider ? AllTeamMembershipQuery()).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
+                  complete((dataProvider ? AllTeamMembershipQuery).mapTo[AllTeamMembershipQueryResponse].map(_.teams))
               }
             }
           }
@@ -201,7 +201,7 @@ object TimesheetService extends App {
       pathPrefix("employees") {
         get {
           pathEndOrSingleSlash {
-            val query = (dataProvider ? EmployeesQuery()).mapTo[EmployeesQueryResponse].map(_.employees)
+            val query = (dataProvider ? EmployeesQuery).mapTo[EmployeesQueryResponse].map(_.employees)
             complete(query)
           }
         }

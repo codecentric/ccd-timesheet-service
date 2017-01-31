@@ -1,105 +1,111 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.time.LocalDate
-import java.util.Date
 
-import akka.actor.Props
-import akka.testkit.TestActorRef
-import de.codecentric.ccdashboard.service.timesheet.BaseAkkaSpec
+import akka.actor.{ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
-import de.codecentric.ccdashboard.service.timesheet.data.model.Worklogs
-import de.codecentric.ccdashboard.service.timesheet.db.{DatabaseReader, DatabaseWriter}
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Team}
+import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
-class DataProviderActorSpec extends BaseAkkaSpec with MockFactory {
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
+class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender with WordSpecLike with Matchers
+  with BeforeAndAfterAll with MockFactory {
 
   //TODO setup actorRef only once
   "DataProviderActor" should {
 
     "handle worklog queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
       val query = WorklogQuery("john.doe", None, None)
 
-      actorRef ! query
+      (reader.getWorklog _)
+        .expects(query.username, query.from, query.to)
+        .returning(Future(WorklogQueryResult(Seq.empty)))
 
-      (reader.getWorklog _).verify(query.username, query.from, query.to)
+      actorRef ! query
     }
 
     "handle user queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val name = "john.doe"
 
-      actorRef ! UserQuery(name)
+      (reader.getTeamMembership _).expects(name).returning(Future(List.empty))
 
-      (reader.getTeamMembership _).verify(name)
+      actorRef ! UserQuery(name)
     }
 
     "handle user report queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val name = "john.doe"
 
-      actorRef ! UserReportQuery(name, None, None, ReportQueryAggregationType.MONTHLY)
+      (reader.getTeamMembership _).expects(name).returning(Future(List.empty))
 
-      (reader.getTeamMembership _).verify(name)
+      actorRef ! UserReportQuery(name, None, None, ReportQueryAggregationType.MONTHLY)
     }
 
     "handle issue queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val id = "101"
 
-      actorRef ! IssueQuery(id)
+      val mockIssue = Issue("test", "testKey", "testUrl", None, Map.empty, None, Map.empty, Map.empty)
 
-      (reader.getIssueById _).verify(id)
+      (reader.getIssueById _).expects(id).returning(Future(mockIssue))
+
+      actorRef ! IssueQuery(id)
     }
 
     "handle single team membership queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val teamId = 101
 
-      actorRef ! SingleTeamMembershipQuery(teamId)
+      (reader.getTeamMembers _).expects(teamId).returning(Future(SingleTeamMembershipQueryResponse(None)))
 
-      (reader.getTeamMembers _).verify(teamId)
+      actorRef ! SingleTeamMembershipQuery(teamId)
     }
 
     "handle all team memberships queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
-      actorRef ! AllTeamMembershipQuery
+      (reader.getTeamIds _).expects().returning(Future(List.empty))
 
-      (reader.getTeamIds _).verify()
+      actorRef ! AllTeamMembershipQuery
     }
 
     "handle employee queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
-      actorRef ! EmployeesQuery
+      (reader.getEmployees _).expects().returning(Future(EmployeesQueryResponse(List.empty)))
 
-      (reader.getEmployees _).verify()
+      actorRef ! EmployeesQuery
     }
 
     "handle team report queries" in {
-      val reader = stub[DatabaseReader]
+      val reader = mock[DatabaseReader]
       val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
       val teamId = 101
+      val team = Team(42, "test", None)
+
+      (reader.getTeamById _).expects(teamId).returning(Future(team))
 
       actorRef ! TeamReportQuery(teamId, None, None, ReportQueryAggregationType.MONTHLY)
-
-      (reader.getTeamById _).verify(teamId)
     }
-
-
   }
 }
 
