@@ -60,10 +60,6 @@ class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging 
         case TeamMember(name, from, _, _) => name -> from.getOrElse(new Date(0))
       }.toMap.asJava
 
-      val team2MemberMap = members.map {
-        case TeamMember(name, from, to, available) => name -> (from, to, available)
-      }
-
       dbWriter.updateTeams(membersMap, teamId)
       dbWriter.insertTeamMembers(members,teamId)
 

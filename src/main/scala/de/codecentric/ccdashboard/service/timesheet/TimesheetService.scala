@@ -205,16 +205,7 @@ object TimesheetService extends App {
               }
             }
           }
-      } ~
-      pathPrefix("team2") {
-         path(IntNumber.?) { id =>
-             get {
-               pathEndOrSingleSlash {
-                 complete("Not implemented yet")
-               }
-             }
-           }
-       } ~
+      }
       pathPrefix("employees") {
         get {
           pathEndOrSingleSlash {
