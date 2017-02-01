@@ -119,8 +119,13 @@ object CassandraReader extends DatabaseReader {
   }
 
   def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
-    ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
       extractor = row => row.get(0, dateToken))
+
+    result.map {
+      case null => List.empty
+      case l: List[Date] => l
+    }
   }
 
   def getUserByName(username: String): Future[Option[User]] = {
