@@ -1,6 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.data.access
 
-import java.time.LocalDate
+import java.time.{Clock, LocalDate}
 import java.time.LocalDate.now
 import java.time.temporal.{ChronoUnit, TemporalAdjusters}
 import java.util.Date
@@ -12,7 +12,9 @@ import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
   * Created by tbinias on 23.12.16.
   */
 class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports: List[UserUtilization],
-                          employeeSince: Option[Date], year: Int) {
+                          employeeSince: Option[Date], year: Int, providedClock: Option[Clock] = None) {
+
+  implicit final val clock: Clock = providedClock.getOrElse(Clock.systemDefaultZone())
 
   final private val TARGET_HOURS_BASE = 1440
   final private val VACATION_DAYS_PER_YEAR = 30
@@ -20,9 +22,9 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   final private val startOfYear = LocalDate.ofYearDay(year, 1)
   final private val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
 
-  final val userStartOfYear: Date = employeeSince.getOrElse(startOfYear.asUtilDate)
-  private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartOfYear.asLocalDate, endOfYear) +
-    (if (userStartOfYear.asLocalDate.getDayOfMonth == 15) 0.5 else 1)
+  final val userStartOfYear: Date = employeeSince.getOrElse(startOfYear.asUtilDate(clock))
+  private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartOfYear.asLocalDate(clock), endOfYear) +
+    (if (userStartOfYear.asLocalDate(clock).getDayOfMonth == 15) 0.5 else 1)
   final val vacationDaysThisYear: Long = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
 
   final val workDaysThisYear: Int = fullYearSchedules.count(_.requiredHours > 0)
@@ -64,11 +66,11 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
     * @return Estimated number of vacation days to take each month
     */
   private def getVacationDaysUsageEstimation(remainingVacationDaysThisYear: Double, endDate: Date) = {
-    val selectedMonth = endDate.asLocalDate.getMonthValue
-    val selectedYear = endDate.asLocalDate.getYear
+    val selectedMonth = endDate.asLocalDate(clock).getMonthValue
+    val selectedYear = endDate.asLocalDate(clock).getYear
     val remainingMonths = List(12 - selectedMonth, 1).max
 
-    if (selectedMonth <= now().getMonthValue || selectedYear < now().getYear) {
+    if (selectedMonth <= now(clock).getMonthValue || selectedYear < now(clock).getYear) {
       0.0
     } else {
       remainingVacationDaysThisYear / remainingMonths
