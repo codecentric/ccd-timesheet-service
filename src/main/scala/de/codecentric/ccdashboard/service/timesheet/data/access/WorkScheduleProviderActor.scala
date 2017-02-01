@@ -56,8 +56,9 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
          val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(getEndDate(startOfYear.getYear).asUtilDate)
 
          val monthlyAccumulation = monthIterator(startOfYear, endOfYear)
-           .map(month => workScheduleService.getWorkScheduleUntil(month.`with`(TemporalAdjusters.lastDayOfMonth()).asUtilDate)).toList
-
+           .map(month => workScheduleService.getWorkScheduleUntil(month
+             .`with`(TemporalAdjusters.lastDayOfMonth()
+             ).atTime(23, 59, 59).asUtilDate)).toList
 
          WorkScheduleQueryResult(username,
            workScheduleService.userStartOfYear,
@@ -78,7 +79,9 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
     if (year == LocalDate.now().getYear) {
       LocalDate.now().atTime(23, 59)
     } else {
-      LocalDate.ofYearDay(year, 31).atTime(23, 59)
+      LocalDate.ofYearDay(year, 1)
+        .`with`(TemporalAdjusters.lastDayOfYear())
+        .atTime(23, 59)
     }
   }
 

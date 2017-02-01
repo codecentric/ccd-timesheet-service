@@ -1,6 +1,6 @@
 package de.codecentric.ccdashboard.service.timesheet.util
 
-import java.time.{LocalDate, LocalDateTime, ZoneId}
+import java.time.{Clock, LocalDate, LocalDateTime}
 import java.util.Date
 
 /**
@@ -10,19 +10,28 @@ object DateConversions {
 
   final class ToLocalDateConverter(val date: Date) {
     def asLocalDate: LocalDate = {
-      date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+      date.toInstant.atZone(Clock.systemDefaultZone().getZone).toLocalDate
+    }
+    def asLocalDate(clock: Clock): LocalDate = {
+      date.toInstant.atZone(clock.getZone).toLocalDate
     }
   }
 
   final class LocalDateToUtilDateConverter(val localDate: LocalDate) {
     def asUtilDate: Date = {
-      Date.from(localDate.atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+      Date.from(localDate.atStartOfDay().atZone(Clock.systemDefaultZone().getZone).toInstant)
+    }
+    def asUtilDate(clock: Clock): Date = {
+      Date.from(localDate.atStartOfDay().atZone(clock.getZone).toInstant)
     }
   }
 
   final class LocalDateTimeToUtilDateConverter(val localDateTime: LocalDateTime) {
     def asUtilDate: Date = {
-      Date.from(localDateTime.atZone(ZoneId.systemDefault()).toInstant())
+      Date.from(localDateTime.atZone(Clock.systemDefaultZone().getZone).toInstant)
+    }
+    def asUtilDate(clock: Clock): Date = {
+      Date.from(localDateTime.atZone(clock.getZone).toInstant)
     }
   }
 
