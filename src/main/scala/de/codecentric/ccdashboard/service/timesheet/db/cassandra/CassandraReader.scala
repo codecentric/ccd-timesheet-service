@@ -122,10 +122,7 @@ object CassandraReader extends DatabaseReader {
     val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
       extractor = row => row.get(0, dateToken))
 
-    result.map {
-      case null => List.empty
-      case l: List[Date] => l
-    }
+    result.map(_.filterNot(_ == null))
   }
 
   def getUserByName(username: String): Future[Option[User]] = {
