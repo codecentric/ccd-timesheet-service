@@ -52,10 +52,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   }
 
   private def aggregate(formatter: DateTimeFormatter) = {
-    val workScheduleGroup = workSchedule
-      .map(s => formatter.format(localDateDecoder.f(s.workDate)) -> s)
-      .groupBy(_._1)
-      .mapValues(_.map(_._2))
+    val workScheduleGroup = workSchedule.groupBy(s => formatter.format(localDateDecoder.f(s.workDate)))
 
     val requiredHoursByKey = workScheduleGroup
       .mapValues(_.foldLeft(0.0)((sum, elem) => sum + elem.requiredHours))
