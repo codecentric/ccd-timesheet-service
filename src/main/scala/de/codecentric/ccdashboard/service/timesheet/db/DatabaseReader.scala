@@ -17,7 +17,7 @@ trait DatabaseReader {
   def getUtilizationReport(username: String, from: Date, to: Date): Future[List[UserUtilization]]
   def getUserSchedule(username: String, from: Date, to: Date): Future[List[UserSchedule]]
 
-  def getTeamMembershipStartDates(username: String): Future[List[Date]]
+  def getUserTeamMembershipDates(username: String): Future[List[TeamMember]]
   def getEmployees(): Future[EmployeesQueryResponse]
   def getTeamIds(): Future[List[Int]]
   def getTeamMembers(teamId: Int): Future[List[TeamMember]]

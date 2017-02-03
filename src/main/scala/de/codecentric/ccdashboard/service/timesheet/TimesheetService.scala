@@ -143,13 +143,13 @@ object TimesheetService extends App {
         } ~
         path("report") {
           get {
-            parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?) { (from, to, aggregationTypeString) =>
+            parameters('from.as[Date].?, 'to.as[Date].?, 'type.as[String].?, 'team.as[Int].?) { (from, to, aggregationTypeString, teamId) =>
               val aggregationType = aggregationTypeString
                 .map(s => Try(ReportQueryAggregationType.withName(s)))
                 .getOrElse(Success(ReportQueryAggregationType.MONTHLY))
                 .get
 
-              val query = (dataProvider ? UserReportQuery(username, from, to, aggregationType)).mapTo[ReportQueryResponse]
+              val query = (dataProvider ? UserReportQuery(username, from, to, teamId, aggregationType)).mapTo[ReportQueryResponse]
               complete(query)
             }
           }

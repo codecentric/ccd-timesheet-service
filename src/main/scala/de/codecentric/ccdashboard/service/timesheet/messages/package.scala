@@ -75,7 +75,7 @@ package object messages {
 
   case class AllTeamMembershipQueryResponse(teams: List[SingleTeamMembershipQueryResponse])
 
-  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], teamId: Option[Int], aggregationType: ReportQueryAggregationType.Value)
 
   case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 

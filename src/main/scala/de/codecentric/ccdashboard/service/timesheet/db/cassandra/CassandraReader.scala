@@ -69,9 +69,8 @@ object CassandraReader extends DatabaseReader {
     val availability = row.getInt("availability")
     val teamId = row.getInt("team_id")
 
-    TeamMember(teamId, memberName, Some(dateFrom), Some(dateTo), Some(availability))
+    TeamMember(teamId, memberName, Option(dateFrom), Option(dateTo), Option(availability))
   }
-
 
   def getTeamById(id: Int): Future[Team] = {
     ctx.executeQuerySingle(s"SELECT id, name FROM team WHERE id = $id",
@@ -118,10 +117,12 @@ object CassandraReader extends DatabaseReader {
     ctx.run(userSchedule(username, from, to))
   }
 
-  def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
-    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
-      extractor = row => row.get(0, dateToken))
+  def getUserTeamMembershipDates(username: String): Future[List[TeamMember]] = {
+    val result = ctx.executeQuery[TeamMember](
+      s"SELECT team_id, member_name, date_from, date_to, availability FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+      extractor = teamMemberExtractor)
 
+    // TODO fix by using quill features
     result.map(_.filterNot(_ == null))
   }
 
