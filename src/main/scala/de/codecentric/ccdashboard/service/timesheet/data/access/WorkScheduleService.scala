@@ -23,12 +23,13 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   final private val endOfYear = startOfYear.`with`(TemporalAdjusters.lastDayOfYear())
 
   final val userStartOfYear: Date = employeeSince.getOrElse(startOfYear.asUtilDate(clock))
-  private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartOfYear.asLocalDate(clock), endOfYear) +
-    (if (userStartOfYear.asLocalDate(clock).getDayOfMonth == 15) 0.5 else 1)
+  val userStartThisYear: Date = Seq(startOfYear.asUtilDate(clock), userStartOfYear).max
+  private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartThisYear.asLocalDate(clock), endOfYear) +
+    (if (userStartThisYear.asLocalDate(clock).getDayOfMonth == 15) 0.5 else 1)
   final val vacationDaysThisYear: Long = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
 
   final val workDaysThisYear: Int = fullYearSchedules.count(_.requiredHours > 0)
-  private val userSchedules = fullYearSchedules.filter(s => s.workDate.after(userStartOfYear) || s.workDate.equals(userStartOfYear))
+  private val userSchedules = fullYearSchedules.filter(!_.workDate.before(userStartThisYear))
   final val userWorkDaysThisYear: Double = getWorkDaysFromUserSchedules(userSchedules)
   final val userWorkDaysAvailabilityRate: Double = userWorkDaysThisYear / workDaysThisYear
 
