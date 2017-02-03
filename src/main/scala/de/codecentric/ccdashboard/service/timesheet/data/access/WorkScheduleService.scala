@@ -70,7 +70,7 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   private def getVacationDaysUsageEstimation(remainingVacationDaysThisYear: Double, endDate: Date) = {
     val selectedMonth = endDate.asLocalDate(clock).getMonthValue
     val selectedYear = endDate.asLocalDate(clock).getYear
-    val remainingMonths = List(12 - selectedMonth, 1).max
+    val remainingMonths = List(12 - selectedMonth + 1, 1).max
 
     if (selectedMonth <= now(clock).getMonthValue || selectedYear < now(clock).getYear) {
       0.0
