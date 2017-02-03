@@ -39,7 +39,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
-      (reader.getTeamMembershipStartDates _).expects(name).returning(Future(List.empty))
+      (reader.getUserTeamMembershipDates _).expects(name).returning(Future(List.empty))
 
       actorRef ! UserQuery(name)
     }
@@ -50,9 +50,9 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
-      (reader.getTeamMembershipStartDates _).expects(name).returning(Future(List.empty))
+      (reader.getUserTeamMembershipDates _).expects(name).returning(Future(List.empty))
 
-      actorRef ! UserReportQuery(name, None, None, ReportQueryAggregationType.MONTHLY)
+      actorRef ! UserReportQuery(name, None, None, None, ReportQueryAggregationType.MONTHLY)
     }
 
     "handle issue queries" in {
@@ -103,7 +103,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
       val teamId = 101
 
       (reader.getTeamMembers _).expects(teamId).returning(Future(List(TeamMember(101, "user1", None, None, Some(100)))))
-      (reader.getTeamMembershipStartDates _).expects("user1").returning(Future(List(new Date())))
+      (reader.getUserTeamMembershipDates _).expects("user1").returning(Future(List(TeamMember(42, "user1", None, None, None))))
 
       actorRef ! TeamReportQuery(teamId, None, None, ReportQueryAggregationType.MONTHLY)
     }

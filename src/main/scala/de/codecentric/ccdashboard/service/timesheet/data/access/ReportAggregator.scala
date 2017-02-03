@@ -16,19 +16,19 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
   import ReportAggregator._
 
-  val today = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
-  val tomorrow = Date.from(LocalDate.now().plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant())
+  val today: Date = Date.from(LocalDate.now().atStartOfDay().atZone(ZoneId.systemDefault()).toInstant)
+  val tomorrow: Date = Date.from(LocalDate.now().plusDays(1).atStartOfDay().atZone(ZoneId.systemDefault()).toInstant)
 
-  val overallHoursRequired = workSchedule.map(_.requiredHours).sum
-  val overallBillableHours = reports.flatMap(_._2.billableHours).sum
-  val overallUtilization = utilization(overallHoursRequired, overallBillableHours)
-  val daysWithoutBookedHours = getDaysWithoutBookedHours()
+  val overallHoursRequired: Double = workSchedule.map(_.requiredHours).sum
+  val overallBillableHours: Double = reports.flatMap(_._2.billableHours).sum
+  val overallUtilization: Double = utilization(overallHoursRequired, overallBillableHours)
+  val daysWithoutBookedHours: List[Date] = getDaysWithoutBookedHours
 
-  def aggregateDaily() = aggregate(dayFormatter)
+  def aggregateDaily(): ReportAggregationResult = aggregate(dayFormatter)
 
-  def aggregateMonthly() = aggregate(monthFormatter)
+  def aggregateMonthly(): ReportAggregationResult = aggregate(monthFormatter)
 
-  def aggregateYearly() = aggregate(yearFormatter)
+  def aggregateYearly(): ReportAggregationResult = aggregate(yearFormatter)
 
   /**
     * Utilization calculation function
@@ -41,21 +41,18 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     if (hoursToWork < 1) billableHours else billableHours / hoursToWork
   }
 
-  private def getDaysWithoutBookedHours() = {
-    val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).groupBy(_.workDate).keys.toList
+  private def getDaysWithoutBookedHours = {
+    val datesRequireBooking = workSchedule.filter(_.requiredHours > 0).map(_.workDate)
 
-    val datesWithBooking = reports.groupBy(_._1).keys.toList
+    val datesWithBooking = reports.map(_._1)
     datesRequireBooking.filterNot(date => datesWithBooking.contains(date))
                        .filterNot(date => date.equals(today))
-                       .sortWith(_.getTime < _.getTime)
+                       .sorted
 
   }
 
   private def aggregate(formatter: DateTimeFormatter) = {
-    val workScheduleGroup = workSchedule
-      .map(s => formatter.format(localDateDecoder.f(s.workDate)) -> s)
-      .groupBy(_._1)
-      .mapValues(_.map(_._2))
+    val workScheduleGroup = workSchedule.groupBy(s => formatter.format(localDateDecoder.f(s.workDate)))
 
     val requiredHoursByKey = workScheduleGroup
       .mapValues(_.foldLeft(0.0)((sum, elem) => sum + elem.requiredHours))
@@ -68,12 +65,11 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     val hoursReportByKey = hoursReportGroup
       .mapValues(_.reduce((left, right) => left + right))
 
-    val valuesByKey = requiredHoursByKey.map({ case (id, requiredHours) => {
+    val valuesByKey = requiredHoursByKey.map({ case (id, requiredHours) =>
       val report = hoursReportByKey.getOrElse(id, ReportEntry())
       val utilizationValue = utilization(requiredHours, report.billableHours.getOrElse(0.0))
       // Note: Other indicators may be inserted here
       id -> (report, utilizationValue)
-    }
     })
 
     val sortedValuesByKey = valuesByKey.toList.sortBy(_._1)
