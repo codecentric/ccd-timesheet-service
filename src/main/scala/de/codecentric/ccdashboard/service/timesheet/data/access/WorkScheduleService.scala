@@ -41,13 +41,15 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
     val reportsTillEndDate = fullYearReports.filter(_.day.before(endDate))
 
     val usedVacationDaysTillTodayInclusive = reportsTillEndDate.flatMap(_.vacationHours).sum / 8
+    val personalLimitedVacationDays = Seq(usedVacationDaysTillTodayInclusive, vacationDaysThisYear.toDouble).min
+
     val usedParentalLeaveDaysTillTodayInclusive = reportsTillEndDate.flatMap(_.parentalLeaveHours).sum / 8
 
-    val remainingVacationDaysThisYear = VACATION_DAYS_PER_YEAR - usedVacationDaysTillTodayInclusive
+    val remainingVacationDaysThisYear = vacationDaysThisYear - personalLimitedVacationDays
     val vacationDaysUsageEstimation = getVacationDaysUsageEstimation(remainingVacationDaysThisYear, endDate)
 
     val workDaysTillEndDate = getWorkDaysFromUserSchedules(userSchedules.filter(_.workDate.before(endDate)))
-    val remainingWorkDays = workDaysTillEndDate - usedVacationDaysTillTodayInclusive - usedParentalLeaveDaysTillTodayInclusive
+    val remainingWorkDays = workDaysTillEndDate - personalLimitedVacationDays - usedParentalLeaveDaysTillTodayInclusive
 
     val targetDays = remainingWorkDays - vacationDaysUsageEstimation
 
