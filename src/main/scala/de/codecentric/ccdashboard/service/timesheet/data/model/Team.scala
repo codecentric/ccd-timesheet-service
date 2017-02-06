@@ -11,4 +11,4 @@ trait Teamable {
   def toTeam: Team
 }
 
-case class Teams(content: List[Team])
+

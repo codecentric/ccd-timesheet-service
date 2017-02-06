@@ -6,7 +6,9 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
+import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.TeamMemberships
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
@@ -14,6 +16,39 @@ import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
+
+object DataProviderActor {
+  /**
+    * Query for worklogs
+    */
+  case class WorklogQuery(username: String, from: Option[Date], to: Option[Date])
+
+
+  /**
+    * Query for a user
+    */
+  case class UserQuery(username: String)
+
+  /**
+    * Query for an issue
+    */
+  case class IssueQuery(id: String)
+  case class TeamQuery(teamId: Option[Int] = None)
+  case class SingleTeamMembershipQuery(teamId: Int)
+
+  case class TeamMemberQuery(teamId: Option[Int] = None)
+
+  case object AllTeamMembershipQuery
+
+  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], teamId: Option[Int], aggregationType: ReportQueryAggregationType.Value)
+
+  case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+
+  /**
+    * Query for all employees
+    */
+  case object EmployeesQuery
+}
 
 /**
   * Created by bjacobs on 18.07.16.

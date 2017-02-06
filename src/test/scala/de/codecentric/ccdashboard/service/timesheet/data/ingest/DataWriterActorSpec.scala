@@ -5,6 +5,7 @@ import java.util.Date
 import akka.actor.Props
 import akka.testkit.TestActorRef
 import de.codecentric.ccdashboard.service.timesheet.BaseAkkaSpec
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseWriter
 import org.scalamock.scalatest.MockFactory
