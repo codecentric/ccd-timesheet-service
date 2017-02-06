@@ -63,7 +63,7 @@ object CassandraReader extends DatabaseReader {
   }
 
   private val teamMemberExtractor = (row: Row)  => {
-    val memberName = row.getString("member_name")
+    val memberName = row.getString("name")
     val dateFrom = row.getTimestamp("date_from")
     val dateTo = row.getTimestamp("date_to")
     val availability = row.getInt("availability")
@@ -84,15 +84,15 @@ object CassandraReader extends DatabaseReader {
   }
 
   def getEmployees(): Future[EmployeesQueryResponse] = {
-    ctx.executeQuery[String]("SELECT member_name from team_member",
-          extractor = row => row.getString("member_name")
+    ctx.executeQuery[String]("SELECT name from team_member",
+          extractor = row => row.getString("name")
     ) .map(_.distinct.sorted)
       .map(EmployeesQueryResponse)
   }
 
   def getTeamMembers(teamId: Int): Future[List[TeamMember]] = {
     ctx.executeQuery[TeamMember](
-      s"SELECT team_id, member_name, date_from, date_to, availability FROM team_member WHERE team_id = $teamId",
+      s"SELECT team_id, name, date_from, date_to, availability FROM team_member WHERE team_id = $teamId",
       extractor = teamMemberExtractor)
   }
 
@@ -119,7 +119,7 @@ object CassandraReader extends DatabaseReader {
 
   def getUserTeamMembershipDates(username: String): Future[List[TeamMember]] = {
     val result = ctx.executeQuery[TeamMember](
-      s"SELECT team_id, member_name, date_from, date_to, availability FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+      s"SELECT team_id, name, date_from, date_to, availability FROM team_member WHERE name = '$username' ALLOW FILTERING;",
       extractor = teamMemberExtractor)
 
     // TODO fix by using quill features
@@ -131,6 +131,10 @@ object CassandraReader extends DatabaseReader {
     ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(_.headOption)
   }
 
+  def getTeamForUser(username: String): Future[Option[Int]] = {
+    val userQuery = quote(query[TeamMember].filter(_.name == lift(username)).take(1).allowFiltering)
+    ctx.run(userQuery).map(_.headOption.map(_.teamId))
+  }
 
   private def userSchedule(username: String, from: Date, to: Date): Quoted[Query[UserSchedule]] = {
     query[UserSchedule]

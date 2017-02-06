@@ -113,7 +113,7 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
   }
 
   def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
-    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE name = '$username' ALLOW FILTERING;",
       extractor = row => row.get(0, dateToken))
 
     result.map(_.filterNot(_ == null))

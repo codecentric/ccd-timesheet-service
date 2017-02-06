@@ -49,6 +49,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
+      (reader.getTeamForUser _).expects(name).returning(Future(None))
       (reader.getUserTeamMembershipDates _).expects(name).returning(Future(List.empty))
 
       actorRef ! UserReportQuery(name, None, None, None, ReportQueryAggregationType.MONTHLY)
