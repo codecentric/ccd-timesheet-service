@@ -38,7 +38,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     * @return Utilization value
     */
   private def utilization(hoursToWork: Double, billableHours: Double) = {
-    if (hoursToWork < 1) billableHours else billableHours / hoursToWork
+    if (hoursToWork < 1) 1.0 else billableHours / hoursToWork
   }
 
   private def getDaysWithoutBookedHours = {
