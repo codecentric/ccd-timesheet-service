@@ -1,15 +1,19 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
-import java.util.Date
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import com.typesafe.config.Config
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataAggregationActor.PerformUtilizationAggregation
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.UtilizationAggregation
 import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Worklog}
 import de.codecentric.ccdashboard.service.timesheet.data.model.Issue._
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
   */
+
+object DataAggregationActor {
+  case class PerformUtilizationAggregation(username: String, worklogs: List[Worklog], issues: List[Issue])
+}
 
 class DataAggregationActor(conf: Config, dataWriter: ActorRef) extends Actor with ActorLogging {
 
@@ -55,7 +59,4 @@ class DataAggregationActor(conf: Config, dataWriter: ActorRef) extends Actor wit
   }
 }
 
-case class PerformUtilizationAggregation(username: String, worklogs: List[Worklog], issues: List[Issue])
-
-case class UtilizationAggregation(username: String, payload: Map[Date, List[Option[Double]]])
 

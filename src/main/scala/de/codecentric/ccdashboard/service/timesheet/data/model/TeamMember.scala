@@ -13,4 +13,4 @@ trait TeamMemberable {
   def toTeamMember: TeamMember
 }
 
-case class TeamMemberships(teamId: Int, teamMembers: List[TeamMember])
+

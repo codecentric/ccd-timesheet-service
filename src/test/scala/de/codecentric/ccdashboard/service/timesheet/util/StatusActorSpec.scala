@@ -3,6 +3,7 @@ package de.codecentric.ccdashboard.service.timesheet.util
 import akka.actor.Props
 import akka.testkit.TestProbe
 import de.codecentric.ccdashboard.service.timesheet.BaseAkkaSpec
+import de.codecentric.ccdashboard.service.timesheet.util.StatusActor.{StatusNotification, StatusQuery}
 
 class StatusActorSpec extends BaseAkkaSpec {
 

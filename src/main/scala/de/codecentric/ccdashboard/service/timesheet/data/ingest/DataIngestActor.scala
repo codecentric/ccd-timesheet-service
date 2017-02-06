@@ -2,13 +2,20 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import com.typesafe.config.Config
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor.{Start, Stop}
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.StatusRequest
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.jira.JiraDataReaderActor
 import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraWriter
-import de.codecentric.ccdashboard.service.timesheet.messages.{Start, Stop}
-import de.codecentric.ccdashboard.service.timesheet.util.StatusRequest
 import io.getquill.CassandraContextConfig
 
 import scala.concurrent.duration._
+
+
+object DataIngestActor {
+  case object Start
+
+  case object Stop
+}
 
 /**
   * Created by bjacobs on 12.07.16.

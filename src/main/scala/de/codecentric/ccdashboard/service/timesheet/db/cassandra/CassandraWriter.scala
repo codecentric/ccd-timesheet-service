@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseWriter
 import de.codecentric.ccdashboard.service.timesheet.util.CassandraContextConfigWithOptions
-import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
+import io.getquill.{CassandraContextConfig, CassandraSyncContext, SnakeCase}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -19,31 +19,31 @@ object CassandraWriter extends DatabaseWriter {
 
   lazy val cassandraContextConfig: CassandraContextConfig = createCassandraContext()
 
-  lazy val metaData: Metadata = cassandraContextConfig.cluster.getMetadata()
+  lazy val metaData: Metadata = cassandraContextConfig.cluster.getMetadata
 
-  lazy val ctx = new CassandraAsyncContext[SnakeCase](cassandraContextConfig)
+  lazy val ctx = new CassandraSyncContext[SnakeCase](cassandraContextConfig)
 
   import ctx._
 
-  def insertWorklogs(ws: List[Worklog]): Future[Unit] = ctx.run(quote {
+  def insertWorklogs(ws: List[Worklog]): Unit = ctx.run(quote {
     liftQuery(ws).foreach(worklog => {
       query[Worklog].insert(worklog)
     })
   })
 
-  def insertUsers(us: List[User]): Future[Unit] = ctx.run(quote {
+  def insertUsers(us: List[User]): Unit = ctx.run(quote {
     liftQuery(us).foreach(user => {
       query[User].insert(user)
     })
   })
 
-  def insertIssue(i: Issue): Future[Unit] = {
+  def insertIssue(i: Issue): Unit = {
     ctx.executeAction("INSERT INTO issue (id, issue_key, issue_url, summary, component, daily_rate, invoicing, issue_type) VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (s) => {
       s.bind(i.id, i.issueKey, i.issueUrl, i.summary.orNull, i.component.asJava, i.dailyRate.orNull, i.invoicing.asJava, i.issueType.asJava)
     })
   }
 
-  def insertTeams(ts: List[Team]): Future[Unit] = Future {
+  def insertTeams(ts: List[Team]): Unit = Future {
     ts.foreach(team =>
       ctx.executeAction("INSERT INTO team (id, name) VALUES (?, ?) IF NOT EXISTS", (st) =>
         st.bind(team.id.asInstanceOf[java.lang.Integer], team.name)
@@ -51,33 +51,33 @@ object CassandraWriter extends DatabaseWriter {
     )
   }
 
-  def insertUtilization(u: UserUtilization): Future[Unit] = ctx.run(quote {
+  def insertUtilization(u: UserUtilization): Unit = ctx.run(quote {
     query[UserUtilization].insert(lift(u))
   })
 
-  def insertUserSchedules(us: List[UserSchedule]): Future[Unit] = ctx.run(quote {
+  def insertUserSchedules(us: List[UserSchedule]): Unit = ctx.run(quote {
     liftQuery(us).foreach(userSchedule => {
       query[UserSchedule].insert(userSchedule)
     })
   })
 
-  def deleteUsers(): Future[Unit] = ctx.run(quote {
+  def deleteUsers(): Unit = ctx.run(quote {
     query[User].delete
   })
 
-  def deleteTeams(): Future[Unit] = ctx.run(quote {
+  def deleteTeams(): Unit = ctx.run(quote {
     query[Team].delete
   })
 
-  def updateTeams(ms: java.util.Map[String, Date], teamId: Int): Future[Unit] = {
+  def updateTeams(ms: java.util.Map[String, Date], teamId: Int): Unit = {
     ctx.executeAction("UPDATE team SET members = ? WHERE id = ?", (st) =>
       st.bind(ms, teamId.asInstanceOf[java.lang.Integer])
     )
   }
 
-  def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit] = Future {
+  def insertTeamMembers(members: List[TeamMember], teamId: Int): Unit = Future {
     members.foreach(member =>
-      ctx.executeAction("INSERT INTO team_member (team_id, member_name, date_from, date_to, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
+      ctx.executeAction("INSERT INTO team_member (team_id, name, date_from, date_to, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
         st.bind(teamId.asInstanceOf[java.lang.Integer], member.name, member.dateFrom.orNull, member.dateTo.orNull, member.availability.getOrElse(100).asInstanceOf[java.lang.Integer])
       )
     )

@@ -8,7 +8,7 @@ import java.util.Date
   */
 object DateConversions {
 
-  final class ToLocalDateConverter(val date: Date) {
+  final implicit class ToLocalDateConverter(val date: Date) extends AnyVal {
     def asLocalDate: LocalDate = {
       date.toInstant.atZone(Clock.systemDefaultZone().getZone).toLocalDate
     }
@@ -17,7 +17,7 @@ object DateConversions {
     }
   }
 
-  final class LocalDateToUtilDateConverter(val localDate: LocalDate) {
+  final implicit class LocalDateToUtilDateConverter(val localDate: LocalDate) extends AnyVal {
     def asUtilDate: Date = {
       Date.from(localDate.atStartOfDay().atZone(Clock.systemDefaultZone().getZone).toInstant)
     }
@@ -26,7 +26,7 @@ object DateConversions {
     }
   }
 
-  final class LocalDateTimeToUtilDateConverter(val localDateTime: LocalDateTime) {
+  final implicit class LocalDateTimeToUtilDateConverter(val localDateTime: LocalDateTime) extends AnyVal {
     def asUtilDate: Date = {
       Date.from(localDateTime.atZone(Clock.systemDefaultZone().getZone).toInstant)
     }
@@ -34,13 +34,4 @@ object DateConversions {
       Date.from(localDateTime.atZone(clock.getZone).toInstant)
     }
   }
-
-  implicit def forUtilDate(date: Date): ToLocalDateConverter =
-    new ToLocalDateConverter(date)
-
-  implicit def forLocalDate(localDate: LocalDate): LocalDateToUtilDateConverter =
-    new LocalDateToUtilDateConverter(localDate)
-
-  implicit def forLocalDateTime(localDateTime: LocalDateTime): LocalDateTimeToUtilDateConverter =
-    new LocalDateTimeToUtilDateConverter(localDateTime)
 }

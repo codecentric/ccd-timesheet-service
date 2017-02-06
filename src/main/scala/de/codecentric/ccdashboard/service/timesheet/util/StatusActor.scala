@@ -1,8 +1,14 @@
 package de.codecentric.ccdashboard.service.timesheet.util
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
+import de.codecentric.ccdashboard.service.timesheet.util.StatusActor.{StatusNotification, StatusQuery}
 
 import scala.collection.mutable
+
+object StatusActor {
+  case class StatusNotification(name: String, status: Map[String, String], importCompleted: Option[Boolean] = None)
+  case object StatusQuery
+}
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>
@@ -24,10 +30,7 @@ class StatusActor extends Actor with ActorLogging {
   }
 }
 
-case class StatusNotification(name: String, status: Map[String, String], importCompleted: Option[Boolean] = None)
 
-case class StatusRequest(statusActor: ActorRef)
 
-case object StatusQuery
 
 case class StatusQueryResponse(statusMap: Map[String, Map[String, String]], importCompleted: Boolean)

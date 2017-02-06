@@ -3,13 +3,21 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 import java.time.LocalDateTime
 import java.util.Date
 
-import akka.actor.{Actor, ActorLogging}
-import com.typesafe.config.Config
+import akka.actor.{Actor, ActorLogging, ActorRef}
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor._
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseWriter
-import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraWriter
-import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
-import io.getquill.{CassandraContextConfig, CassandraSyncContext, SnakeCase}
+import de.codecentric.ccdashboard.service.timesheet.util.StatusActor.StatusNotification
+
+object DataWriterActor {
+
+  case class UtilizationAggregation(username: String, payload: Map[Date, List[Option[Double]]])
+  case class Teams(content: List[Team])
+  case class TeamMemberships(teamId: Int, teamMembers: List[TeamMember])
+  case class StatusRequest(statusActor: ActorRef)
+  final case class Worklogs(content: List[Worklog])
+  final case class Users(content: List[User])
+}
 
 /**
   * Actor that receives Worklogs from a DataIngestActor and stores inserts them into the database

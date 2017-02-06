@@ -6,14 +6,44 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
+import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.TeamMemberships
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
 
-import scala.concurrent.Future
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
+
+object DataProviderActor {
+  /**
+    * Query for worklogs
+    */
+  case class WorklogQuery(username: String, from: Option[Date], to: Option[Date])
+
+  /**
+    * Query for a user
+    */
+  case class UserQuery(username: String)
+
+  /**
+    * Query for an issue
+    */
+  case class IssueQuery(id: String)
+  case class TeamQuery(teamId: Option[Int] = None)
+  case class SingleTeamMembershipQuery(teamId: Int)
+  case class TeamMemberQuery(teamId: Option[Int] = None)
+  case object AllTeamMembershipQuery
+  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], teamId: Option[Int], aggregationType: ReportQueryAggregationType.Value)
+  case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
+
+  /**
+    * Query for all employees
+    */
+  case object EmployeesQuery
+}
 
 /**
   * Created by bjacobs on 18.07.16.
@@ -44,25 +74,31 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val startOfYear = LocalDate.now().withDayOfYear(1)
       val endOfYear = LocalDate.now().`with`(TemporalAdjusters.lastDayOfYear())
 
-      val resultFuture = for {
-        (fromDate, toDate) <- getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate), Option(endOfYear.asUtilDate),
-          username, None)
+      val resultPromise = Promise[UserQueryResult]
+
+      for {
+        (fromDate, toDate) <- getEmployeeSpecificDateRange(Option(startOfYear.asUtilDate), Option(endOfYear.atTime(23, 59, 59).asUtilDate), username, None)
         jiraReports <- dbReader.getUtilizationReport(username, fromDate, toDate)
         userOption <- dbReader.getUserByName(username)
       } yield {
-        val reports = jiraReports.map(
-          u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
-            u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
-            u.otherHours)))
+        if (userOption.isDefined) {
+          val user = userOption.get
 
-        userOption.map(u =>
-          UserQueryResult(Option(u.userkey), Option(u.name), Option(u.emailAddress), Option(u.avatarUrl),
-            Option(u.displayName), Option(u.active), Option(getVacationHours(reports)))
-        ).getOrElse(UserQueryResult())
+          val reports = jiraReports.map(
+            u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
+              u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
+              u.otherHours)))
 
+          val userQueryResult = UserQueryResult(Option(user.userkey), Option(user.name), Option(user.emailAddress),
+            Option(user.avatarUrl), Option(user.displayName), Option(user.active), Option(getVacationHours(reports)))
+
+          resultPromise.success(userQueryResult)
+        } else {
+          resultPromise.failure(new IllegalArgumentException(s"No user found for $username"))
+        }
       }
 
-      resultFuture.pipeTo(requester)
+      resultPromise.future.pipeTo(requester)
       userQueryCount = userQueryCount + 1
 
 
@@ -89,7 +125,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val requester = sender()
       teamMembershipQueryCount = teamMembershipQueryCount + 1
 
-      dbReader.getTeamIds().flatMap(teamIds => {
+      dbReader.getTeamIds.flatMap(teamIds => {
         Future.sequence(
           teamIds.map(teamId => {
             dbReader.getTeamMembers(teamId)
@@ -100,7 +136,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
     case EmployeesQuery =>
       val requester = sender()
-      val query = dbReader.getEmployees()
+      val query = dbReader.getEmployees
       query.pipeTo(requester)
 
     case UserReportQuery(username, from, to, teamId, aggregationType) =>
@@ -124,10 +160,10 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
           allReportAggregations <- usersReportsFut.map(_.map(_.result))
         } yield {
           val allReports = allReportAggregations.flatMap(_.reports)
-          //val size = allReportAggregationsList.size
+
           val overallHoursRequiredList = allReportAggregations.map(_.overallHoursRequired)
           val overallBillableHoursList = allReportAggregations.map(_.overallBillableHours)
-          //val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
+
           val keyGroupedReports = allReports.groupBy(_.key)
 
           val teamReportAggregation = keyGroupedReports.map {
@@ -146,7 +182,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = teamReportAggregation.map(_.utilization).sum / teamReportAggregation.size
           val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization,
-            List[Date](), teamReportAggregation.toList.sortBy(_.key))
+            Option(teamId), List.empty[Date], teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(rangeFromDate, rangeToDate, aggregationType.toString, result)
         }
 
@@ -161,23 +197,30 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     * @param username        User to aggregate report for
     * @param from            Optional start date. If none provided, either the start date of the user in the team (if provided) is used. Otherwise the earliest available date in the database is used.
     * @param to              Optional end date. If none provided, either the end date fo the user in the team (if provided) is used. Otherwise today is used.
-    * @param teamId          Optional team-id. If provided, only the time range of the user within the team is used.
+    * @param maybeTeamId     Optional team-id. If provided, only the time range of the user within the team is used.
     * @param aggregationType Aggregation type to perform
     * @return User report for given user
     */
   private def getUserReport(username: String, from: Option[Date],
-                            to: Option[Date], teamId: Option[Int],
+                            to: Option[Date], maybeTeamId: Option[Int],
                             aggregationType: ReportQueryAggregationType.Value) = {
+
+    val teamIdFuture =  maybeTeamId
+      .map(n => Future(Option(n)))
+      .getOrElse(dbReader.getTeamForUser(username))
+
+
     for {
-      (fromDate, toDate) <- getEmployeeSpecificDateRange(from, to, username, teamId)
+      (fromDate, toDate) <- getEmployeeSpecificDateRange(from, to, username, maybeTeamId)
       utilizationReports <- dbReader.getUtilizationReport(username, fromDate, toDate)
       workSchedule <- dbReader.getUserSchedule(username, fromDate, toDate)
+      teamId <- teamIdFuture
     } yield {
       val reports = utilizationReports.map(
         u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
           u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
           u.otherHours)))
-      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
+      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType, teamId)
 
       ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
     }
@@ -197,19 +240,29 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     */
   private def filterTeamMembersInRange(selectionRangeFromDate: Date, selectionRangeToDate: Date,
                                        teamMembers: List[TeamMember]) = {
-    teamMembers.filter(member => {
-      val fromCondition = member.dateFrom match {
-        case None => true
-        case Some(dateFrom) => !dateFrom.after(selectionRangeToDate)
-      }
+    teamMembers.filter(member => teamMemberInRange(member.dateFrom, member.dateTo, selectionRangeFromDate, selectionRangeToDate))
+  }
 
-      val toCondition = member.dateTo match {
-        case None => true
-        case Some(dateTo) => !dateTo.before(selectionRangeFromDate)
-      }
+  /**
+    * Check whether the user was active at some point within the given time interval
+    * @param memberDateFrom         User member date from
+    * @param memberDateTo           User member date to
+    * @param selectionRangeFromDate Time range start date
+    * @param selectionRangeToDate   Time range end date
+    * @return true, if user was active within this time range on basis of the member's start and end dates
+    */
+  private def teamMemberInRange(memberDateFrom: Option[Date], memberDateTo: Option[Date], selectionRangeFromDate: Date, selectionRangeToDate: Date) = {
+    val fromCondition = memberDateFrom match {
+      case None => true
+      case Some(dateFrom) => !dateFrom.after(selectionRangeToDate)
+    }
 
-      fromCondition && toCondition
-    })
+    val toCondition = memberDateTo match {
+      case None => true
+      case Some(dateTo) => !dateTo.before(selectionRangeFromDate)
+    }
+
+    fromCondition && toCondition
   }
 
   /**
@@ -230,47 +283,51 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       userTeamMembershipDates => {
         val generalRange = (fromDate, toDate)
 
-        if (userTeamMembershipDates.isEmpty || teamIdOpt.isEmpty) {
+        if (userTeamMembershipDates.isEmpty) {
           generalRange
         } else {
-          val teamId = teamIdOpt.get
-          userTeamMembershipDates.find(_.teamId == teamId) match {
-            case None => (fromDate, fromDate)
-            case Some(member) =>
-              // only select the more restrictive date from team-dates and selection-dates
-              val teamStartDate = List(member.dateFrom, Some(fromDate)).flatten.max
-              val teamEndDate = Seq(member.dateTo, Some(toDate)).flatten.min
-              (teamStartDate, teamEndDate)
+          val filteredUserTeamMembershipDates = teamIdOpt match {
+            case Some(id) => userTeamMembershipDates.filter(_.teamId == id)
+            case None => userTeamMembershipDates
           }
+
+          // Map startDate or endDate = None to selected start date
+          val teamStartDates = filteredUserTeamMembershipDates.map(_.dateFrom.getOrElse(fromDate))
+          val teamEndDates = filteredUserTeamMembershipDates.map(_.dateTo.getOrElse(toDate))
+
+          val usedStartDate = teamStartDates match {
+            case Nil => fromDate
+            case list => Seq(list.min, fromDate).max
+          }
+
+          val usedEndDate = teamEndDates match {
+            case Nil => toDate
+            case list => Seq(list.max, toDate).min
+          }
+
+          (usedStartDate, usedEndDate)
         }
       }
     }
   }
 
-  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)], workSchedule: List[UserSchedule],
-                                    aggregationType: ReportQueryAggregationType.Value): ReportAggregationResult = {
+  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)],
+                                    workSchedule: List[UserSchedule],
+                                    aggregationType: ReportQueryAggregationType.Value,
+                                    teamId: Option[Int]): ReportAggregationResult = {
     val aggregator = ReportAggregator(reports, workSchedule)
 
     aggregationType match {
       case ReportQueryAggregationType.DAILY =>
-        aggregator.aggregateDaily()
+        aggregator.aggregateDaily(teamId)
 
       case ReportQueryAggregationType.MONTHLY =>
-        aggregator.aggregateMonthly()
+        aggregator.aggregateMonthly(teamId)
 
       case ReportQueryAggregationType.YEARLY =>
-        aggregator.aggregateYearly()
+        aggregator.aggregateYearly(teamId)
     }
   }
-
-
-  def generateReportQueryResponse(fromDate: Date, toDate: Date,
-                                  aggregationResultFuture: Future[ReportAggregationResult],
-                                  aggregationType: ReportQueryAggregationType.Value): Future[ReportQueryResponse] =
-    aggregationResultFuture.map { aggregationResult => {
-      ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
-    }
-    }
 
   private def getVacationHours(reports: List[(Date, ReportEntry)]) = {
     val today = LocalDate.now().asUtilDate
@@ -279,6 +336,4 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     val plannedHours = reports.filter(_._1.after(today)).flatMap(_._2.vacationHours).sum
     VacationHours(usedHours, plannedHours, 30 * 8 - usedHours - plannedHours)
   }
-
-
 }

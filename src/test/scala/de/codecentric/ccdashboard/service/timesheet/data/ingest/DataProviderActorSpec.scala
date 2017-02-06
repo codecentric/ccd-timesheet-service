@@ -1,12 +1,11 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.time.LocalDate
-import java.util.Date
-
 import akka.actor.{ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, Team, TeamMember}
+import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor._
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Issue, TeamMember}
 import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import org.scalamock.scalatest.MockFactory
@@ -50,6 +49,7 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
 
       val name = "john.doe"
 
+      (reader.getTeamForUser _).expects(name).returning(Future(None))
       (reader.getUserTeamMembershipDates _).expects(name).returning(Future(List.empty))
 
       actorRef ! UserReportQuery(name, None, None, None, ReportQueryAggregationType.MONTHLY)

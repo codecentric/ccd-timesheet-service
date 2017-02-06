@@ -7,6 +7,7 @@ import java.util.Date
 import akka.actor.{Actor, ActorLogging}
 import akka.pattern.pipe
 import com.google.common.reflect.TypeToken
+import de.codecentric.ccdashboard.service.timesheet.data.access.WorkScheduleProviderActor.WorkScheduleQuery
 import de.codecentric.ccdashboard.service.timesheet.data.model.{UserSchedule, UserUtilization}
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.DateConversions._
@@ -14,6 +15,10 @@ import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
 import scala.concurrent.Future
 
+
+object WorkScheduleProviderActor {
+  case class WorkScheduleQuery(username: String, year: Option[Int])
+}
 
 /**
   * Created by tbinias on 22.12.16.
@@ -108,7 +113,7 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
   }
 
   def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
-    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE member_name = '$username' ALLOW FILTERING;",
+    val result = ctx.executeQuery(s"SELECT date_from FROM team_member WHERE name = '$username' ALLOW FILTERING;",
       extractor = row => row.get(0, dateToken))
 
     result.map(_.filterNot(_ == null))

@@ -8,7 +8,10 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.{Directives, Route}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
@@ -19,9 +22,14 @@ import com.typesafe.config.ConfigFactory
 import de.codecentric.ccdashboard.service.timesheet.data.access._
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor
+import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor._
+import de.codecentric.ccdashboard.service.timesheet.data.access.WorkScheduleProviderActor.WorkScheduleQuery
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor.Start
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.StatusRequest
 import de.codecentric.ccdashboard.service.timesheet.db.cassandra.CassandraReader
 import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.routing.CustomPathMatchers._
+import de.codecentric.ccdashboard.service.timesheet.util.StatusActor.{StatusNotification, StatusQuery}
 import de.codecentric.ccdashboard.service.timesheet.util._
 import de.heikoseeberger.akkahttpcirce.CirceSupport
 
@@ -103,6 +111,11 @@ object TimesheetService extends App {
     bindingFuture
   }
 
+  val userNotFoundExceptionHandler = ExceptionHandler {
+    case ex: IllegalArgumentException =>
+      complete(HttpResponse(NotFound, entity = ex.getMessage))
+  }
+
   /**
     * Defines the service endpoints
     */
@@ -127,10 +140,12 @@ object TimesheetService extends App {
     }
 
     pathPrefix("user" / usernameMatcher) { username =>
-      get {
-        pathEndOrSingleSlash {
-          val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
-          complete(query)
+      handleExceptions(userNotFoundExceptionHandler) {
+        get {
+          pathEndOrSingleSlash {
+            val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
+            complete(query)
+          }
         }
       } ~
         path("worklog") {
