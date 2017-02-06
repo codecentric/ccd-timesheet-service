@@ -23,7 +23,6 @@ object DataProviderActor {
     */
   case class WorklogQuery(username: String, from: Option[Date], to: Option[Date])
 
-
   /**
     * Query for a user
     */
@@ -35,13 +34,9 @@ object DataProviderActor {
   case class IssueQuery(id: String)
   case class TeamQuery(teamId: Option[Int] = None)
   case class SingleTeamMembershipQuery(teamId: Int)
-
   case class TeamMemberQuery(teamId: Option[Int] = None)
-
   case object AllTeamMembershipQuery
-
   case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], teamId: Option[Int], aggregationType: ReportQueryAggregationType.Value)
-
   case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
 
   /**
@@ -130,7 +125,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
       val requester = sender()
       teamMembershipQueryCount = teamMembershipQueryCount + 1
 
-      dbReader.getTeamIds().flatMap(teamIds => {
+      dbReader.getTeamIds.flatMap(teamIds => {
         Future.sequence(
           teamIds.map(teamId => {
             dbReader.getTeamMembers(teamId)
@@ -141,7 +136,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
     case EmployeesQuery =>
       val requester = sender()
-      val query = dbReader.getEmployees()
+      val query = dbReader.getEmployees
       query.pipeTo(requester)
 
     case UserReportQuery(username, from, to, teamId, aggregationType) =>
@@ -165,10 +160,10 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
           allReportAggregations <- usersReportsFut.map(_.map(_.result))
         } yield {
           val allReports = allReportAggregations.flatMap(_.reports)
-          //val size = allReportAggregationsList.size
+
           val overallHoursRequiredList = allReportAggregations.map(_.overallHoursRequired)
           val overallBillableHoursList = allReportAggregations.map(_.overallBillableHours)
-          //val overallUtilizationList = allReportAggregationsList.map(_.overallUtilization)
+
           val keyGroupedReports = allReports.groupBy(_.key)
 
           val teamReportAggregation = keyGroupedReports.map {
@@ -202,7 +197,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     * @param username        User to aggregate report for
     * @param from            Optional start date. If none provided, either the start date of the user in the team (if provided) is used. Otherwise the earliest available date in the database is used.
     * @param to              Optional end date. If none provided, either the end date fo the user in the team (if provided) is used. Otherwise today is used.
-    * @param maybeTeamId          Optional team-id. If provided, only the time range of the user within the team is used.
+    * @param maybeTeamId     Optional team-id. If provided, only the time range of the user within the team is used.
     * @param aggregationType Aggregation type to perform
     * @return User report for given user
     */
@@ -250,10 +245,10 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
   /**
     * Check whether the user was active at some point within the given time interval
-    * @param memberDateFrom User member date from
-    * @param memberDateTo User member date to
+    * @param memberDateFrom         User member date from
+    * @param memberDateTo           User member date to
     * @param selectionRangeFromDate Time range start date
-    * @param selectionRangeToDate Time range end date
+    * @param selectionRangeToDate   Time range end date
     * @return true, if user was active within this time range on basis of the member's start and end dates
     */
   private def teamMemberInRange(memberDateFrom: Option[Date], memberDateTo: Option[Date], selectionRangeFromDate: Date, selectionRangeToDate: Date) = {

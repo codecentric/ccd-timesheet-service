@@ -1,7 +1,5 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
-import java.util.Date
-
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataAggregationActor.PerformUtilizationAggregation
