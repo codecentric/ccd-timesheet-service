@@ -8,7 +8,10 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.event.Logging
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
-import akka.http.scaladsl.server.{Directives, Route}
+import akka.http.scaladsl.model.StatusCodes._
+import akka.http.scaladsl.model._
+import akka.http.scaladsl.server.Directives._
+import akka.http.scaladsl.server.{Directives, ExceptionHandler, Route}
 import akka.http.scaladsl.unmarshalling.Unmarshaller
 import akka.pattern.ask
 import akka.stream.{ActorMaterializer, Materializer}
@@ -103,6 +106,11 @@ object TimesheetService extends App {
     bindingFuture
   }
 
+  val userNotFoundExceptionHandler = ExceptionHandler {
+    case ex: IllegalArgumentException =>
+      complete(HttpResponse(NotFound, entity = ex.getMessage))
+  }
+
   /**
     * Defines the service endpoints
     */
@@ -127,10 +135,12 @@ object TimesheetService extends App {
     }
 
     pathPrefix("user" / usernameMatcher) { username =>
-      get {
-        pathEndOrSingleSlash {
-          val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
-          complete(query)
+      handleExceptions(userNotFoundExceptionHandler) {
+        get {
+          pathEndOrSingleSlash {
+            val query = (dataProvider ? UserQuery(username)).mapTo[UserQueryResult]
+            complete(query)
+          }
         }
       } ~
         path("worklog") {
