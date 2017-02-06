@@ -181,7 +181,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
           val overallBillableHours = overallBillableHoursList.sum
           val overallUtilization = teamReportAggregation.map(_.utilization).sum / teamReportAggregation.size
           val result = ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization,
-            List[Date](), teamReportAggregation.toList.sortBy(_.key))
+            Option(teamId), List.empty[Date], teamReportAggregation.toList.sortBy(_.key))
           ReportQueryResponse(rangeFromDate, rangeToDate, aggregationType.toString, result)
         }
 
@@ -196,23 +196,30 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     * @param username        User to aggregate report for
     * @param from            Optional start date. If none provided, either the start date of the user in the team (if provided) is used. Otherwise the earliest available date in the database is used.
     * @param to              Optional end date. If none provided, either the end date fo the user in the team (if provided) is used. Otherwise today is used.
-    * @param teamId          Optional team-id. If provided, only the time range of the user within the team is used.
+    * @param maybeTeamId          Optional team-id. If provided, only the time range of the user within the team is used.
     * @param aggregationType Aggregation type to perform
     * @return User report for given user
     */
   private def getUserReport(username: String, from: Option[Date],
-                            to: Option[Date], teamId: Option[Int],
+                            to: Option[Date], maybeTeamId: Option[Int],
                             aggregationType: ReportQueryAggregationType.Value) = {
+
+    val teamIdFuture =  maybeTeamId
+      .map(n => Future(Option(n)))
+      .getOrElse(dbReader.getTeamForUser(username))
+
+
     for {
-      (fromDate, toDate) <- getEmployeeSpecificDateRange(from, to, username, teamId)
+      (fromDate, toDate) <- getEmployeeSpecificDateRange(from, to, username, maybeTeamId)
       utilizationReports <- dbReader.getUtilizationReport(username, fromDate, toDate)
       workSchedule <- dbReader.getUserSchedule(username, fromDate, toDate)
+      teamId <- teamIdFuture
     } yield {
       val reports = utilizationReports.map(
         u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
           u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
           u.otherHours)))
-      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
+      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType, teamId)
 
       ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
     }
@@ -282,19 +289,21 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
     }
   }
 
-  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)], workSchedule: List[UserSchedule],
-                                    aggregationType: ReportQueryAggregationType.Value): ReportAggregationResult = {
+  def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)],
+                                    workSchedule: List[UserSchedule],
+                                    aggregationType: ReportQueryAggregationType.Value,
+                                    teamId: Option[Int]): ReportAggregationResult = {
     val aggregator = ReportAggregator(reports, workSchedule)
 
     aggregationType match {
       case ReportQueryAggregationType.DAILY =>
-        aggregator.aggregateDaily()
+        aggregator.aggregateDaily(teamId)
 
       case ReportQueryAggregationType.MONTHLY =>
-        aggregator.aggregateMonthly()
+        aggregator.aggregateMonthly(teamId)
 
       case ReportQueryAggregationType.YEARLY =>
-        aggregator.aggregateYearly()
+        aggregator.aggregateYearly(teamId)
     }
   }
 

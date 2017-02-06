@@ -77,7 +77,7 @@ object CassandraWriter extends DatabaseWriter {
 
   def insertTeamMembers(members: List[TeamMember], teamId: Int): Future[Unit] = Future {
     members.foreach(member =>
-      ctx.executeAction("INSERT INTO team_member (team_id, member_name, date_from, date_to, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
+      ctx.executeAction("INSERT INTO team_member (team_id, name, date_from, date_to, availability) VALUES (?, ?, ?, ?, ?) IF NOT EXISTS", (st) =>
         st.bind(teamId.asInstanceOf[java.lang.Integer], member.name, member.dateFrom.orNull, member.dateTo.orNull, member.availability.getOrElse(100).asInstanceOf[java.lang.Integer])
       )
     )

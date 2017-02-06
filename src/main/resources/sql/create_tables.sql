@@ -61,9 +61,9 @@ CREATE TABLE team (
 
 CREATE TABLE IF NOT EXISTS team_member (
   team_id int,
-  member_name text,
+  name text,
   date_from timestamp,
   date_to timestamp,
   availability int,
-  PRIMARY KEY(team_id, member_name)
+  PRIMARY KEY(team_id, name)
 );
