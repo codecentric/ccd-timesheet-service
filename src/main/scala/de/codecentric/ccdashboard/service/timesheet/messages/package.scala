@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.util.Date
 
 import de.codecentric.ccdashboard.service.timesheet.data.access.ReportAggregationResult
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor.TeamMemberships
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 
 /**
@@ -13,16 +14,7 @@ import de.codecentric.ccdashboard.service.timesheet.data.model._
   */
 package object messages {
 
-  /* Life-cycle messages */
-  case object Start
-
-  case object Stop
-
   /* Query messages */
-  /**
-    * Query for worklogs
-    */
-  case class WorklogQuery(username: String, from: Option[Date], to: Option[Date])
 
   /**
     * Query for worklogs response
@@ -31,10 +23,6 @@ package object messages {
     */
   case class WorklogQueryResult(worklogs: Seq[Worklog])
 
-  /**
-    * Query for a user
-    */
-  case class UserQuery(username: String)
 
   case class VacationHours(used: Double, planned: Double, free: Double)
 
@@ -49,22 +37,11 @@ package object messages {
                              active: Option[Boolean] = None,
                              vacationHours: Option[VacationHours] = None)
 
-  /**
-    * Query for an issue
-    */
-  case class IssueQuery(id: String)
 
   /**
     * Query for issue response
     */
   case class IssueQueryResult(issue: Option[Issue])
-
-  case class TeamQuery(teamId: Option[Int] = None)
-  case class SingleTeamMembershipQuery(teamId: Int)
-
-  case class TeamMemberQuery(teamId: Option[Int] = None)
-  case object AllTeamMembershipQuery
-
   /**
     * Query in which team a user is and since when
     */
@@ -75,14 +52,7 @@ package object messages {
 
   case class AllTeamMembershipQueryResponse(teams: List[SingleTeamMembershipQueryResponse])
 
-  case class UserReportQuery(username: String, from: Option[Date], to: Option[Date], teamId: Option[Int], aggregationType: ReportQueryAggregationType.Value)
 
-  case class TeamReportQuery(teamId: Int, from: Option[Date], to: Option[Date], aggregationType: ReportQueryAggregationType.Value)
-
-  /**
-    * Query for all employees
-   */
-  case object EmployeesQuery
 
   case class EmployeesQueryResponse(employees: List[String])
 
@@ -128,25 +98,8 @@ package object messages {
 
   /* TODO: describe tasks */
 
-  case class TempoWorklogQueryTask(toDate: LocalDate, fromDate: LocalDate, syncing: Boolean)
-
-  case class TempoUserScheduleQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
-
-  case object JiraUserQueryTask
-
-  case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
-
-  case class JiraIssueDetailsQueryTaskResponse(issue: Issue)
-
-  case object JiraTempoTeamQueryTask
-
-  case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
-
-  case class JiraTempoUserAvailabilityQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
-
   case class EnrichWorklogQueryData(username: String, worklogs: List[Worklog], issues: List[Issue])
 
-  case class WorkScheduleQuery(username: String, year: Option[Int])
 
   case class WorkScheduleEntry(date: Date,
                                usedVacationDays: Double,

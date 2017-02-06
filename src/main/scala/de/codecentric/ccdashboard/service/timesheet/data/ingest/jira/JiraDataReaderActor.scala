@@ -10,17 +10,35 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
-import de.codecentric.ccdashboard.service.timesheet.data.ingest.{BaseDataReaderActor, DataAggregationActor, PerformUtilizationAggregation}
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataAggregationActor.PerformUtilizationAggregation
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataIngestActor.Start
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor._
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.jira.JiraDataReaderActor._
+import de.codecentric.ccdashboard.service.timesheet.data.ingest.{BaseDataReaderActor, DataAggregationActor}
 import de.codecentric.ccdashboard.service.timesheet.data.model._
 import de.codecentric.ccdashboard.service.timesheet.data.model.jira._
-import de.codecentric.ccdashboard.service.timesheet.messages.{JiraIssueDetailsQueryTask, JiraTempoTeamMembersQueryTask, JiraTempoTeamQueryTask, _}
-import de.codecentric.ccdashboard.service.timesheet.util.{StatusNotification, StatusRequest}
+import de.codecentric.ccdashboard.service.timesheet.util.StatusActor.StatusNotification
 import io.circe.generic.auto._
 import io.circe.parser._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success}
+
+object JiraDataReaderActor {
+  case class TempoWorklogQueryTask(toDate: LocalDate, fromDate: LocalDate, syncing: Boolean)
+  case object JiraUserQueryTask
+  case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
+
+  case class JiraIssueDetailsQueryTaskResponse(issue: Issue)
+
+  case object JiraTempoTeamQueryTask
+  case class TempoUserScheduleQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
+  case class JiraTempoTeamMembersQueryTask(teamIdsToQuery: List[Int])
+
+  case class JiraTempoUserAvailabilityQueryTask(username: String, startDate: LocalDate, endDate: LocalDate)
+}
+
 
 /**
   * @author Björn Jacobs <bjoern.jacobs@codecentric.de>

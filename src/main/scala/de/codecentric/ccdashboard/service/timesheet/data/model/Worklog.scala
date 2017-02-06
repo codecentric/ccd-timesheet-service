@@ -37,4 +37,4 @@ final case class Worklog(worklogId: Int,
   override def toWorklog: Worklog = this
 }
 
-final case class Worklogs(content: List[Worklog])
+
