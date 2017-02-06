@@ -65,7 +65,7 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
   import context.dispatcher
 
   def receive: Receive = {
-    case DataProviderActor.WorklogQuery(username, from, to) =>
+    case WorklogQuery(username, from, to) =>
       val requester = sender()
       log.debug("Received WorklogQuery")
       dbReader.getWorklog(username, from, to)
