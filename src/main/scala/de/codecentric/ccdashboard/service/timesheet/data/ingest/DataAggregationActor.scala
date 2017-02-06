@@ -56,8 +56,6 @@ class DataAggregationActor(conf: Config, dataWriter: ActorRef) extends Actor wit
       }
 
       dataWriter ! UtilizationAggregation(username, utilizationAggregationValues)
-
-    case _ => log.warning("Received unknown message")
   }
 }
 

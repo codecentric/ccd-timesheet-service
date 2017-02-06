@@ -84,6 +84,5 @@ class DataWriterActor(dbWriter: DatabaseWriter) extends Actor with ActorLogging 
         "last write" -> lastWrite.map(_.toString).getOrElse("")
       ))
 
-    case x => log.warning(s"Received unknown message: $x")
   }
 }
