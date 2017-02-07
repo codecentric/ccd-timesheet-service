@@ -174,8 +174,9 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
               val reducedReports = reports.reduce((l, r) => l + r)
               val reducedUtilization = utilization.sum / utilization.size
+              val workDays = reportAggregations(0).workDays
 
-              ReportAggregation(key, reducedReports, reducedUtilization, numberOfConsultants)
+              ReportAggregation(key, reducedReports, reducedUtilization, workDays, numberOfConsultants)
           }
 
           val overallHoursRequired = overallHoursRequiredList.sum
