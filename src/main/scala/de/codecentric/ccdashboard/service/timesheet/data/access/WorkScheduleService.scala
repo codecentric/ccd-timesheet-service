@@ -27,8 +27,8 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   private val userMonthsThisYear = ChronoUnit.MONTHS.between(userStartThisYear.asLocalDate(clock), endOfYear) +
     (if (userStartThisYear.asLocalDate(clock).getDayOfMonth == 15) 0.5 else 1)
   final val vacationDaysThisYear: Long = (userMonthsThisYear * VACATION_DAYS_PER_YEAR / 12).round
-  final val usedVacationDaysThisYear: Double = getUsedVacationDays(year)
-  final val plannedVacationDaysThisYear: Double = fullYearReports.filter(_.day.after(now(clock).asUtilDate(clock))).flatMap(_.vacationHours).sum / 8
+  final val usedVacationDays: Double = getUsedVacationDays(year)
+  final val plannedVacationDays: Double = fullYearReports.filter(_.day.after(now(clock).asUtilDate(clock))).flatMap(_.vacationHours).sum / 8
 
   final val workDaysThisYear: Int = fullYearSchedules.count(_.requiredHours > 0)
   private val userSchedules = fullYearSchedules.filter(!_.workDate.before(userStartThisYear))
