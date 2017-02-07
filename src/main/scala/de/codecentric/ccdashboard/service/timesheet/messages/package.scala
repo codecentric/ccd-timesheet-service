@@ -112,6 +112,8 @@ package object messages {
                                      userWorkDaysThisYear: Long,
                                      userWorkDaysAvailabilityRate: Double,
                                      vacationDaysThisYear: Long,
+                                     usedVacationDaysThisYear: Double,
+                                     plannedVacationDaysThisYear: Double,
                                      parentalLeaveDaysThisYear: Double,
                                      targetHoursThisYear: Double,
                                      burndownHoursPerWorkday: Double,

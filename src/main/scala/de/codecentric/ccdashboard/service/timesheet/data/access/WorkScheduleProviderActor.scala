@@ -71,6 +71,8 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
            workScheduleService.userWorkDaysThisYear.round,
            workScheduleService.userWorkDaysAvailabilityRate,
            workScheduleService.vacationDaysThisYear,
+           workScheduleService.usedVacationDaysThisYear,
+           workScheduleService.plannedVacationDaysThisYear,
            workScheduleService.parentalLeaveDaysThisYear,
            workScheduleService.targetHoursThisYear,
            workScheduleService.burndownHoursPerWorkday,
