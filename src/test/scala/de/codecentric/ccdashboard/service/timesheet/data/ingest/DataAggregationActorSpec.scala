@@ -2,7 +2,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.time.LocalDate
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.typesafe.config.Config
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
@@ -20,6 +20,9 @@ class DataAggregationActorSpec extends TestKit(ActorSystem("MySpec")) with Impli
   val conf = mock[Config]
   val actorRef = TestActorRef(Props(new DataAggregationActor(conf, dataWriter)))
 
+  override def afterAll() = {
+    actorRef ! PoisonPill
+  }
 
 
   "DataAggregationActor" should {

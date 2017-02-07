@@ -2,7 +2,7 @@ package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.util.Date
 
-import akka.actor.Props
+import akka.actor.{PoisonPill, Props}
 import akka.testkit.TestActorRef
 import de.codecentric.ccdashboard.service.timesheet.BaseAkkaSpec
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataWriterActor._
@@ -12,10 +12,15 @@ import org.scalamock.scalatest.MockFactory
 
 class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
 
+  val writer = stub[DatabaseWriter]
+  val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
+
+  override def afterAll() = {
+    actorRef ! PoisonPill
+  }
+
   "DataWriterActor" should {
     "handle empty worklogs" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
 
       actorRef ! Worklogs(List())
 
@@ -23,8 +28,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle user messages" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val users = List()
 
       actorRef ! Users(users)
@@ -34,8 +37,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle Issue messages" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val issue = Issue("","","",None, Map(), None, Map(), Map())
 
       actorRef ! issue
@@ -44,8 +45,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle Team messages" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val teams = List()
 
       actorRef ! Teams(teams)
@@ -55,8 +54,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle Team membership messages" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val members = List()
 
       actorRef ! TeamMemberships(0, members)
@@ -65,8 +62,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle user schedules" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val schedules = List()
 
       actorRef ! UserSchedules("", schedules)
@@ -75,8 +70,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle empty utilization aggregation" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val utilization = UserUtilization("", new Date(), None, None, None, None, None, None, None, None, None, None, None)
 
       actorRef ! UtilizationAggregation("", Map())
@@ -85,8 +78,6 @@ class DataWriterActorSpec extends BaseAkkaSpec with MockFactory {
     }
 
     "handle Non-empty utilization aggregation" in {
-      val writer = stub[DatabaseWriter]
-      val actorRef = TestActorRef(Props(new DataWriterActor(writer)))
       val aggregation = UtilizationAggregation("", Map(new Date() -> List.range(0,11).map(n => Option(n.toDouble))))
 
       actorRef ! aggregation
