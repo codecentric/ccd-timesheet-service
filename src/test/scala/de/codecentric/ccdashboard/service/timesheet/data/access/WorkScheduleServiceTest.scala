@@ -30,9 +30,9 @@ class WorkScheduleServiceTest extends WordSpecLike with Matchers with BeforeAndA
       assert((service.parentalLeaveDaysThisYear - 0.0).abs < 0.00001)
       assert(service.userStartOfYear.equals(Date.from(LocalDateTime.parse("2016-01-01T00:00:00").atZone(clock.getZone).toInstant)))
       assert(service.vacationDaysThisYear == 30L)
-      assert(service.workDaysThisYear == 1)
-      assert((service.userWorkDaysThisYear - 1.0).abs < 0.00001)
-      assert((service.userWorkDaysAvailabilityRate - 1.0).abs < 0.00001)
+      assert(service.workdaysThisYear == 1)
+      assert((service.userWorkdaysThisYear - 1.0).abs < 0.00001)
+      assert((service.userWorkdaysAvailabilityRate - 1.0).abs < 0.00001)
     }
 
     "calculate correct values for provided data with parental leave" in {

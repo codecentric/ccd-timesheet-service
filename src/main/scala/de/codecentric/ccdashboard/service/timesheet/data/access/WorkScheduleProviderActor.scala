@@ -67,9 +67,9 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
 
          WorkScheduleQueryResult(username,
            workScheduleService.userStartOfYear,
-           workScheduleService.workDaysThisYear,
-           workScheduleService.userWorkDaysThisYear.round,
-           workScheduleService.userWorkDaysAvailabilityRate,
+           workScheduleService.workdaysThisYear,
+           workScheduleService.userWorkdaysThisYear.round,
+           workScheduleService.userWorkdaysAvailabilityRate,
            workScheduleService.vacationDaysThisYear,
            workScheduleService.parentalLeaveDaysThisYear,
            workScheduleService.targetHoursThisYear,
@@ -94,7 +94,7 @@ class WorkScheduleProviderActor(cassandraContextConfig: CassandraContextConfig) 
     Iterator.iterate(start)(_ plusMonths 1) takeWhile (_ isBefore end)
   }
 
-  private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
+  private def getWorkdaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
   }
 
