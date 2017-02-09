@@ -49,9 +49,9 @@ class WorkScheduleProviderActor(dbReader: DatabaseReader) extends Actor with Act
 
          WorkScheduleQueryResult(username,
            workScheduleService.userStartOfYear,
-           workScheduleService.workDaysThisYear,
-           workScheduleService.userWorkDaysThisYear.round,
-           workScheduleService.userWorkDaysAvailabilityRate,
+           workScheduleService.workdaysThisYear,
+           workScheduleService.userWorkdaysThisYear.round,
+           workScheduleService.userWorkdaysAvailabilityRate,
            workScheduleService.vacationDaysThisYear,
            workScheduleService.usedVacationDays,
            workScheduleService.plannedVacationDays,
@@ -78,7 +78,7 @@ class WorkScheduleProviderActor(dbReader: DatabaseReader) extends Actor with Act
     Iterator.iterate(start)(_ plusMonths 1) takeWhile (_ isBefore end)
   }
 
-  private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
+  private def getWorkdaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
   }
 

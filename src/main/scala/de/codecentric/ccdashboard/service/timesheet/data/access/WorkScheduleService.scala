@@ -30,15 +30,15 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
   final val usedVacationDays: Double = getUsedVacationDays(year)
   final val plannedVacationDays: Double = fullYearReports.filter(_.day.after(now(clock).asUtilDate(clock))).flatMap(_.vacationHours).sum / 8
 
-  final val workDaysThisYear: Int = fullYearSchedules.count(_.requiredHours > 0)
+  final val workdaysThisYear: Int = fullYearSchedules.count(_.requiredHours > 0)
   private val userSchedules = fullYearSchedules.filter(!_.workDate.before(userStartThisYear))
-  final val userWorkDaysThisYear: Double = getWorkDaysFromUserSchedules(userSchedules)
-  final val userWorkDaysAvailabilityRate: Double = userWorkDaysThisYear / workDaysThisYear
+  final val userWorkdaysThisYear: Double = getWorkdaysFromUserSchedules(userSchedules)
+  final val userWorkdaysAvailabilityRate: Double = userWorkdaysThisYear / workdaysThisYear
 
   final val parentalLeaveDaysThisYear: Double = fullYearReports.flatMap(_.parentalLeaveHours).sum / 8
-  final val targetHoursThisYear: Double = (TARGET_HOURS_BASE * userWorkDaysAvailabilityRate) - (parentalLeaveDaysThisYear * 8 * 0.8)
+  final val targetHoursThisYear: Double = (TARGET_HOURS_BASE * userWorkdaysAvailabilityRate) - (parentalLeaveDaysThisYear * 8 * 0.8)
 
-  final val burndownHoursPerWorkday: Double = targetHoursThisYear / (userWorkDaysThisYear - vacationDaysThisYear - parentalLeaveDaysThisYear)
+  final val burndownHoursPerWorkday: Double = targetHoursThisYear / (userWorkdaysThisYear - vacationDaysThisYear - parentalLeaveDaysThisYear)
 
   def getWorkScheduleUntil(endDate: Date): WorkScheduleEntry = {
     val reportsTillEndDate = fullYearReports.filter(_.day.before(endDate))
@@ -51,10 +51,10 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
     val remainingVacationDaysThisYear = vacationDaysThisYear - personalLimitedVacationDays
     val vacationDaysUsageEstimation = getVacationDaysUsageEstimation(remainingVacationDaysThisYear, endDate)
 
-    val workDaysTillEndDate = getWorkDaysFromUserSchedules(userSchedules.filter(_.workDate.before(endDate)))
-    val remainingWorkDays = workDaysTillEndDate - personalLimitedVacationDays - usedParentalLeaveDaysTillTodayInclusive
+    val workdaysTillEndDate = getWorkdaysFromUserSchedules(userSchedules.filter(_.workDate.before(endDate)))
+    val remainingWorkdays = workdaysTillEndDate - personalLimitedVacationDays - usedParentalLeaveDaysTillTodayInclusive
 
-    val targetDays = remainingWorkDays - vacationDaysUsageEstimation
+    val targetDays = remainingWorkdays - vacationDaysUsageEstimation
 
     val targetHoursToday = List(targetDays * burndownHoursPerWorkday, targetHoursThisYear).min
 
@@ -82,7 +82,7 @@ class WorkScheduleService(fullYearSchedules: List[UserSchedule], fullYearReports
     }
   }
 
-  private def getWorkDaysFromUserSchedules(schedules: List[UserSchedule]) = {
+  private def getWorkdaysFromUserSchedules(schedules: List[UserSchedule]) = {
     schedules.map(_.requiredHours).sum / 8
   }
 

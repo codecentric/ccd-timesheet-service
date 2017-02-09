@@ -108,9 +108,9 @@ package object messages {
 
   case class WorkScheduleQueryResult(username: String,
                                      userStartOfYear: Date,
-                                     workDaysThisYear: Long,
-                                     userWorkDaysThisYear: Long,
-                                     userWorkDaysAvailabilityRate: Double,
+                                     workdaysThisYear: Long,
+                                     userWorkdaysThisYear: Long,
+                                     userWorkdaysAvailabilityRate: Double,
                                      vacationDaysThisYear: Long,
                                      usedVacationDays: Double,
                                      plannedVacationDays: Double,
