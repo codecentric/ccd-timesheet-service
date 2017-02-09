@@ -24,11 +24,11 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
   val overallUtilization: Double = utilization(overallHoursRequired, overallBillableHours)
   val daysWithoutBookedHours: List[Date] = getDaysWithoutBookedHours
 
-  def aggregateDaily(teamId: Option[Int]): ReportAggregationResult = aggregate(dayFormatter, teamId)
+  def aggregateDaily(): ReportAggregationResult = aggregate(dayFormatter)
 
-  def aggregateMonthly(teamId: Option[Int]): ReportAggregationResult = aggregate(monthFormatter, teamId)
+  def aggregateMonthly(): ReportAggregationResult = aggregate(monthFormatter)
 
-  def aggregateYearly(teamId: Option[Int]): ReportAggregationResult = aggregate(yearFormatter, teamId)
+  def aggregateYearly(): ReportAggregationResult = aggregate(yearFormatter)
 
   /**
     * Utilization calculation function
@@ -51,7 +51,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
   }
 
-  private def aggregate(formatter: DateTimeFormatter, teamId: Option[Int]) = {
+  private def aggregate(formatter: DateTimeFormatter) = {
     val workScheduleGroup = workSchedule.groupBy(s => formatter.format(localDateDecoder.f(s.workDate)))
 
     val requiredHoursByKey = workScheduleGroup
@@ -76,7 +76,7 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
 
     val reportsList = sortedValuesByKey.map({ case (key, (report, utilization)) => ReportAggregation(key, report, utilization) })
 
-    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, teamId, daysWithoutBookedHours, reportsList)
+    ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, None, daysWithoutBookedHours, reportsList)
   }
 }
 

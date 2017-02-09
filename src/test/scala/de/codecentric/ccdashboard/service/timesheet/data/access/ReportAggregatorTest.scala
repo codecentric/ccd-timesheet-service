@@ -40,7 +40,7 @@ class ReportAggregatorTest extends FunSuite {
   val agg = ReportAggregator(mappedReports, mappedWorkSchedules)
 
   test("testAggregateDaily") {
-    val m = agg.aggregateDaily(Option(0)).reports.map(x => x.key -> x).toMap
+    val m = agg.aggregateDaily().reports.map(x => x.key -> x).toMap
     assert((m("2015-07-01").utilization - 1.0).abs < 0.01)
     assert((m("2015-07-02").utilization - 0.5).abs < 0.01)
     assert(m("2015-07-03").utilization.abs < 0.01)
@@ -50,26 +50,26 @@ class ReportAggregatorTest extends FunSuite {
   }
 
   test("testAggregateMonthly") {
-    val m = agg.aggregateMonthly(Option(0)).reports.map(x => x.key -> x).toMap
+    val m = agg.aggregateMonthly().reports.map(x => x.key -> x).toMap
     assert((m("2015-07").utilization - 0.5).abs < 0.01)
     assert((m("2016-08").utilization - 0.25).abs < 0.01)
     assert((m("2016-09").utilization - 1.0).abs < 0.01)
   }
 
   test("testAggregateYearly") {
-    val m = agg.aggregateYearly(Option(0)).reports.map(x => x.key -> x).toMap
+    val m = agg.aggregateYearly().reports.map(x => x.key -> x).toMap
     assert((m("2015").utilization - 0.5).abs < 0.01)
     assert((m("2016").utilization - 0.5).abs < 0.01)
   }
 
   test("daysWithoutBookedHours") {
-    val daysWithoutBookedHours = agg.aggregateMonthly(Option(0)).daysWithoutBookedHours
+    val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
     assert(daysWithoutBookedHours.size == 1)
     assert(daysWithoutBookedHours.contains(dateFormat.parse("2015-07-03")))
   }
 
   test("daysWithoutBookedHours should not contain today") {
-    val daysWithoutBookedHours = agg.aggregateMonthly(Option(0)).daysWithoutBookedHours
+    val daysWithoutBookedHours = agg.aggregateMonthly().daysWithoutBookedHours
     assert(!daysWithoutBookedHours.contains(today))
   }
 }

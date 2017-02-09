@@ -205,24 +205,33 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
                             to: Option[Date], maybeTeamId: Option[Int],
                             aggregationType: ReportQueryAggregationType.Value) = {
 
-    val teamIdFuture =  maybeTeamId
-      .map(n => Future(Option(n)))
-      .getOrElse(dbReader.getTeamForUser(username))
-
+    val teamMembershipsFut = dbReader.getUserTeamMembershipDates(username)
+    val teamStartDatesFut = teamMembershipsFut.map(list => {
+      list.map(teamMembership => {
+        (teamMembership.dateFrom.getOrElse(importStartDate.asUtilDate), teamMembership.teamId)
+      })
+    })
 
     for {
       (fromDate, toDate) <- getEmployeeSpecificDateRange(from, to, username, maybeTeamId)
       utilizationReports <- dbReader.getUtilizationReport(username, fromDate, toDate)
       workSchedule <- dbReader.getUserSchedule(username, fromDate, toDate)
-      teamId <- teamIdFuture
+      teamStartDates <- teamStartDatesFut
     } yield {
+
+      val latestTeamId = to.map(toDate => {
+        teamStartDates.filter(_._1.before(toDate)).maxBy(_._1)._2
+      }).getOrElse(teamStartDates.maxBy(_._1)._2)
+
       val reports = utilizationReports.map(
         u => (u.day, ReportEntry(u.billableHours, u.adminHours, u.vacationHours, u.preSalesHours, u.recruitingHours,
           u.illnessHours, u.travelTimeHours, u.twentyPercentHours, u.absenceHours, u.parentalLeaveHours,
           u.otherHours)))
-      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType, teamId)
 
-      ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResult)
+      val aggregationResult = aggregateReportsWithSchedules(reports, workSchedule, aggregationType)
+      val aggregationResultWithTeam = aggregationResult.copy(team = Some(latestTeamId))
+
+      ReportQueryResponse(fromDate, toDate, aggregationType.toString, aggregationResultWithTeam)
     }
   }
 
@@ -313,19 +322,18 @@ class DataProviderActor(startDate: => LocalDate, dbReader: DatabaseReader) exten
 
   def aggregateReportsWithSchedules(reports: List[(Date, ReportEntry)],
                                     workSchedule: List[UserSchedule],
-                                    aggregationType: ReportQueryAggregationType.Value,
-                                    teamId: Option[Int]): ReportAggregationResult = {
+                                    aggregationType: ReportQueryAggregationType.Value): ReportAggregationResult = {
     val aggregator = ReportAggregator(reports, workSchedule)
 
     aggregationType match {
       case ReportQueryAggregationType.DAILY =>
-        aggregator.aggregateDaily(teamId)
+        aggregator.aggregateDaily()
 
       case ReportQueryAggregationType.MONTHLY =>
-        aggregator.aggregateMonthly(teamId)
+        aggregator.aggregateMonthly()
 
       case ReportQueryAggregationType.YEARLY =>
-        aggregator.aggregateYearly(teamId)
+        aggregator.aggregateYearly()
     }
   }
 
