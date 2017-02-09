@@ -22,5 +22,4 @@ trait DatabaseReader {
   def getTeamIds: Future[List[Int]]
   def getTeamMembers(teamId: Int): Future[List[TeamMember]]
   def getUserByName(username: String): Future[Option[User]]
-  def getTeamForUser(username: String): Future[Option[Int]]
 }

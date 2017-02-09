@@ -2,22 +2,18 @@ package de.codecentric.ccdashboard.service.timesheet.db.cassandra
 
 import java.util.Date
 
-import com.datastax.driver.core.{Row, SocketOptions, TupleValue, TypeTokens}
+import com.datastax.driver.core.{Row, SocketOptions}
 import com.google.common.reflect.TypeToken
 import com.typesafe.config.ConfigFactory
-import de.codecentric.ccdashboard.service.timesheet.data.model.{Team, User}
+import de.codecentric.ccdashboard.service.timesheet.data.model.{Team, User, _}
+import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
+import de.codecentric.ccdashboard.service.timesheet.messages._
 import de.codecentric.ccdashboard.service.timesheet.util.CassandraContextConfigWithOptions
 import io.getquill.{CassandraAsyncContext, CassandraContextConfig, SnakeCase}
 
-import scala.concurrent.Future
 import scala.collection.JavaConverters._
-import de.codecentric.ccdashboard.service.timesheet.data.model._
-import de.codecentric.ccdashboard.service.timesheet.db.DatabaseReader
-import de.codecentric.ccdashboard.service.timesheet.messages._
-import io.getquill.context.cassandra.CassandraSessionContext
-
-import scala.collection.immutable.Map
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object CassandraReader extends DatabaseReader {
 
@@ -129,11 +125,6 @@ object CassandraReader extends DatabaseReader {
   def getUserByName(username: String): Future[Option[User]] = {
     val userQuery = quote(query[User])
     ctx.run(userQuery.filter(_.name == lift(username)).take(1)).map(_.headOption)
-  }
-
-  def getTeamForUser(username: String): Future[Option[Int]] = {
-    val userQuery = quote(query[TeamMember].filter(_.name == lift(username)).take(1).allowFiltering)
-    ctx.run(userQuery).map(_.headOption.map(_.teamId))
   }
 
   private def userSchedule(username: String, from: Date, to: Date): Quoted[Query[UserSchedule]] = {
