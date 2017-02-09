@@ -68,13 +68,14 @@ class ReportAggregator(reports: List[(Date, ReportEntry)], workSchedule: List[Us
     val valuesByKey = requiredHoursByKey.map({ case (id, requiredHours) =>
       val report = hoursReportByKey.getOrElse(id, ReportEntry())
       val utilizationValue = utilization(requiredHours, report.billableHours.getOrElse(0.0))
+      val workDays = (requiredHours / 8).toInt
       // Note: Other indicators may be inserted here
-      id -> (report, utilizationValue)
+      id -> (report, utilizationValue, workDays)
     })
 
     val sortedValuesByKey = valuesByKey.toList.sortBy(_._1)
 
-    val reportsList = sortedValuesByKey.map({ case (key, (report, utilization)) => ReportAggregation(key, report, utilization) })
+    val reportsList = sortedValuesByKey.map({ case (key, (report, utilization, workDays)) => ReportAggregation(key, report, utilization, workDays) })
 
     ReportAggregationResult(overallHoursRequired, overallBillableHours, overallUtilization, None, daysWithoutBookedHours, reportsList)
   }
@@ -89,7 +90,7 @@ object ReportAggregator {
   private val yearFormatter = DateTimeFormatter.ofPattern("yyyy")
 }
 
-case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, numberOfConsultants: Int = 1)
+case class ReportAggregation(key: String, report: ReportEntry, utilization: Double, workDays: Int, numberOfConsultants: Int = 1)
 
 case class ReportAggregationResult(overallHoursRequired: Double,
                                    overallBillableHours: Double,

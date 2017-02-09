@@ -53,6 +53,8 @@ class WorkScheduleProviderActor(dbReader: DatabaseReader) extends Actor with Act
            workScheduleService.userWorkDaysThisYear.round,
            workScheduleService.userWorkDaysAvailabilityRate,
            workScheduleService.vacationDaysThisYear,
+           workScheduleService.usedVacationDays,
+           workScheduleService.plannedVacationDays,
            workScheduleService.parentalLeaveDaysThisYear,
            workScheduleService.targetHoursThisYear,
            workScheduleService.burndownHoursPerWorkday,
