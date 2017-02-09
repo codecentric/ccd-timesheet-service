@@ -85,7 +85,7 @@ object TimesheetService extends App {
       LocalDate.parse(conf.getString("timesheet-service.data-import.start-date")),
       CassandraReader
     )), "data-provider")
-    val workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(cassandraContextConfig)), "work-schedule-provider")
+    val workScheduleProvider = system.actorOf(Props(new WorkScheduleProviderActor(CassandraReader)), "work-schedule-provider")
     val bindingFuture = Http().bindAndHandle(route(dataProvider,workScheduleProvider), interface, port)
 
     system.scheduler.schedule(5.seconds, 30.seconds, new Runnable {

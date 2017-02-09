@@ -1,7 +1,8 @@
 package de.codecentric.ccdashboard.service.timesheet.data.ingest
 
 import java.time.LocalDate
-import akka.actor.{ActorSystem, Props}
+
+import akka.actor.{ActorSystem, PoisonPill, Props}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit}
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor
 import de.codecentric.ccdashboard.service.timesheet.data.access.DataProviderActor._
@@ -17,12 +18,17 @@ import scala.concurrent.Future
 class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with ImplicitSender with WordSpecLike with Matchers
   with BeforeAndAfterAll with MockFactory {
 
-  //TODO setup actorRef only once
+  val reader = mock[DatabaseReader]
+  val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
+
+  override def afterAll() = {
+    actorRef ! PoisonPill
+  }
+
   "DataProviderActor" should {
 
     "handle worklog queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
+
       val query = WorklogQuery("john.doe", None, None)
 
       (reader.getWorklog _)
@@ -33,8 +39,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle user queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val name = "john.doe"
 
@@ -44,8 +48,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle user report queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val name = "john.doe"
 
@@ -56,8 +58,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle issue queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val id = "101"
 
@@ -69,8 +69,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle single team membership queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       val teamId = 101
 
@@ -80,8 +78,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle all team memberships queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       (reader.getTeamIds _).expects().returning(Future(List.empty))
 
@@ -89,8 +85,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle employee queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
 
       (reader.getEmployees _).expects().returning(Future(EmployeesQueryResponse(List.empty)))
 
@@ -98,8 +92,6 @@ class DataProviderActorSpec extends TestKit(ActorSystem("MySpec")) with Implicit
     }
 
     "handle team report queries" in {
-      val reader = mock[DatabaseReader]
-      val actorRef = TestActorRef(Props(new DataProviderActor(LocalDate.now(), reader)))
       val teamId = 101
 
       (reader.getTeamMembers _).expects(teamId).returning(Future(List(TeamMember(101, "user1", None, None, Some(100)))))

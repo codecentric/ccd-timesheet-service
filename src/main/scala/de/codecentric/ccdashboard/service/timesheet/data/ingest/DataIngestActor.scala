@@ -52,6 +52,5 @@ class DataIngestActor(conf: Config, cassandraContextConfig: CassandraContextConf
       log.info("Stopped child actors")
       unbecome
 
-    case x => log.info(s"Received unknown message: $x")
   }
 }
