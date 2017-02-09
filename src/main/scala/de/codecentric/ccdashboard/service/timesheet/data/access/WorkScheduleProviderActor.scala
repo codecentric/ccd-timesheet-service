@@ -38,7 +38,7 @@ class WorkScheduleProviderActor(dbReader: DatabaseReader) extends Actor with Act
          employeeStartDates <- getTeamMembershipStartDates(username)
       } yield {
          val workScheduleService = new WorkScheduleService(fullYearSchedules, fullYearReports,
-           employeeStartDates.sorted.headOption, startOfYear.getYear)
+           employeeStartDates.sorted.head, startOfYear.getYear)
 
          val totalWorkSchedule = workScheduleService.getWorkScheduleUntil(getEndDate(startOfYear.getYear).asUtilDate)
 
@@ -82,9 +82,9 @@ class WorkScheduleProviderActor(dbReader: DatabaseReader) extends Actor with Act
     schedules.map(_.requiredHours).sum / 8
   }
 
-  def getTeamMembershipStartDates(username: String): Future[List[Date]] = {
+  def getTeamMembershipStartDates(username: String): Future[List[Option[Date]]] = {
     val result = dbReader.getUserTeamMembershipDates(username)
 
-    result.map(_.map(_.dateFrom.getOrElse(new Date())))
+    result.map(_.map(_.dateFrom))
   }
 }
