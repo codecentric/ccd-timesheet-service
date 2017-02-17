@@ -39,6 +39,15 @@ trait JiraRequestUriGenerators {
     Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
   }
 
+  def getSingleJiraUserRequestUri(username: String) = {
+    val path = Uri.Path(jiraConfig.jiraUsersServicePath)
+    val queryString = Query(Map(
+      "username" -> username,
+      "maxResults" -> "100000")).toString
+
+    Uri(scheme = scheme, authority = authority, path = path, queryString = Some(queryString))
+  }
+
   def getJiraIssueDetailsUri(issueId: Either[String, Int]) = {
     val issueIdString = issueId match {
       case Left(key) => key

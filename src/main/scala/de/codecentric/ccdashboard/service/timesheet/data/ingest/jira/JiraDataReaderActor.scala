@@ -8,6 +8,7 @@ import akka.http.scaladsl.model.Uri
 import akka.http.scaladsl.unmarshalling.Unmarshal
 import akka.pattern.ask
 import akka.util.Timeout
+import akka.pattern.pipe
 import com.typesafe.config.{Config, ConfigFactory}
 import de.codecentric.ccdashboard.service.timesheet.data.encoding._
 import de.codecentric.ccdashboard.service.timesheet.data.ingest.DataAggregationActor.PerformUtilizationAggregation
@@ -28,6 +29,7 @@ import scala.util.{Failure, Success}
 object JiraDataReaderActor {
   case class TempoWorklogQueryTask(toDate: LocalDate, fromDate: LocalDate, syncing: Boolean)
   case object JiraUserQueryTask
+  case class SingleJiraUserQueryTask(username: String)
   case class JiraIssueDetailsQueryTask(issueId: Either[String, Int])
 
   case class JiraIssueDetailsQueryTaskResponse(issue: Issue)
@@ -199,6 +201,15 @@ class JiraDataReaderActor(conf: Config, dataWriter: ActorRef) extends BaseDataRe
           log.error(ex, s"Users-import failed. Rescheduling next users-import in ${jiraConfig.importWaitBetweenBatches}")
           context.system.scheduler.scheduleOnce(jiraConfig.importWaitBetweenBatches, self, q)
       }
+
+    case SingleJiraUserQueryTask(username) =>
+      val uri = getSingleJiraUserRequestUri(username)
+
+      val future = performAsyncJsonQuery(uri, s => decode[List[JiraUser]](s), "Could not decode users.")
+        .map(_.map(_.toUser))
+
+      future.pipeTo(dataWriter)
+
 
     case TempoUserScheduleQueryTask(username, startDate, endDate) =>
       log.debug("Jira user schedules task received.")
